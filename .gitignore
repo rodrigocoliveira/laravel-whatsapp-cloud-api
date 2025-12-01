@@ -1,0 +1,32 @@
+# Dependencies
+/vendor
+/node_modules
+composer.lock
+
+# IDE & OS
+.DS_Store
+Thumbs.db
+/.idea
+/.vscode
+/.fleet
+/.zed
+/.nova
+.phpactor.json
+
+# Testing
+/.phpunit.cache
+.phpunit.result.cache
+coverage/
+
+# Build artifacts
+/build
+
+# Environment
+.env
+.env.*
+
+# Auth
+/auth.json
+
+# Logs
+*.log
