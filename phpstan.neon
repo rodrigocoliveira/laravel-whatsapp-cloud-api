@@ -1,0 +1,14 @@
+includes:
+    - ./vendor/phpstan/phpstan/conf/bleedingEdge.neon
+
+parameters:
+    level: 5
+    paths:
+        - src
+    tmpDir: build/phpstan
+    reportUnmatchedIgnoredErrors: false
+    ignoreErrors:
+        - '#Call to an undefined static method Multek\\LaravelWhatsAppCloud\\Models\\WhatsApp#'
+        - '#Call to an undefined method Illuminate\\Console\\Scheduling\\Event::everyMinutes#'
+        - '#Call to an undefined method Illuminate\\Contracts\\Filesystem\\Filesystem::url#'
+        - '#Call to an undefined method Illuminate\\Contracts\\Filesystem\\Filesystem::temporaryUrl#'
