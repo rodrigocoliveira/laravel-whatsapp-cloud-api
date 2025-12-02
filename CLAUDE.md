@@ -162,7 +162,7 @@ Key configuration options in `config/whatsapp.php`:
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `api_version` | `v21.0` | Meta Graph API version |
+| `api_version` | `v24.0` | Meta Graph API version |
 | `processing_mode` | `batch` | `batch` or `immediate` |
 | `batch_window_seconds` | `3` | Seconds to wait before processing |
 | `batch_max_messages` | `10` | Max messages per batch |

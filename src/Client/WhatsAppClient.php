@@ -21,7 +21,7 @@ class WhatsAppClient implements WhatsAppClientInterface
         protected WhatsAppPhone $phone,
     ) {
         $this->baseUrl = config('whatsapp.api_base_url', 'https://graph.facebook.com');
-        $this->apiVersion = config('whatsapp.api_version', 'v21.0');
+        $this->apiVersion = config('whatsapp.api_version', 'v24.0');
     }
 
     /**

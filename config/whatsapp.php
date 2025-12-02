@@ -8,7 +8,7 @@ return [
     | WhatsApp Cloud API Settings
     |--------------------------------------------------------------------------
     */
-    'api_version' => env('WHATSAPP_API_VERSION', 'v21.0'),
+    'api_version' => env('WHATSAPP_API_VERSION', 'v24.0'),
     'api_base_url' => 'https://graph.facebook.com',
     'access_token' => env('WHATSAPP_ACCESS_TOKEN'),
 
