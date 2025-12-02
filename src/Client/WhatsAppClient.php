@@ -465,13 +465,26 @@ class WhatsAppClient implements WhatsAppClientInterface
 
         if (! $response->successful()) {
             $error = $response->json('error', []);
+            $code = $error['code'] ?? 0;
             $message = $error['message'] ?? 'Unknown error';
 
-            if (($error['code'] ?? 0) === 190) {
-                throw MessageSendException::rateLimited();
-            }
+            // Log full error for debugging
+            Log::error('WhatsApp API error', [
+                'code' => $code,
+                'message' => $message,
+                'error' => $error,
+                'fbtrace_id' => $error['fbtrace_id'] ?? null,
+                'phone_id' => $this->phone->phone_id,
+            ]);
 
-            throw MessageSendException::apiError($message, $error);
+            throw match ($code) {
+                190 => MessageSendException::invalidAccessToken($message, $error),
+                4 => MessageSendException::rateLimited($message, $error),
+                100 => MessageSendException::invalidParameter($message, $error),
+                200 => MessageSendException::permissionDenied($message, $error),
+                368 => MessageSendException::temporarilyBlocked($message, $error),
+                default => MessageSendException::apiError($message, $error),
+            };
         }
 
         return $response->json();
