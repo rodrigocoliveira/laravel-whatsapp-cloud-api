@@ -33,6 +33,9 @@ return new class extends Migration
             $table->boolean('transcription_enabled')->default(false);
             $table->string('transcription_service')->nullable();
 
+            // Auto typing
+            $table->boolean('auto_typing_enabled')->default(true);
+
             // Message type filtering
             $table->json('allowed_message_types')->nullable();
             $table->string('on_disallowed_type')->default('ignore');
