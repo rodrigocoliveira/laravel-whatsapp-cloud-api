@@ -354,6 +354,37 @@ class WhatsAppClient implements WhatsAppClientInterface
     }
 
     /**
+     * Start typing indicator.
+     */
+    public function startTyping(string $to): array
+    {
+        $response = $this->http()->post($this->getMessagesEndpoint(), [
+            'messaging_product' => 'whatsapp',
+            'recipient_type' => 'individual',
+            'to' => $this->normalizePhoneNumber($to),
+            'type' => 'typing',
+        ]);
+
+        return $response->json();
+    }
+
+    /**
+     * Stop typing indicator.
+     */
+    public function stopTyping(string $to): array
+    {
+        $response = $this->http()->post($this->getMessagesEndpoint(), [
+            'messaging_product' => 'whatsapp',
+            'recipient_type' => 'individual',
+            'to' => $this->normalizePhoneNumber($to),
+            'type' => 'typing',
+            'typing' => ['action' => 'stop'],
+        ]);
+
+        return $response->json();
+    }
+
+    /**
      * Upload media to WhatsApp.
      */
     public function uploadMedia(string $filePath, string $mimeType): array

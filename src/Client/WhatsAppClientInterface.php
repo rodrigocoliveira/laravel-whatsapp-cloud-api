@@ -116,6 +116,20 @@ interface WhatsAppClientInterface
     public function markAsRead(string $messageId): array;
 
     /**
+     * Start typing indicator.
+     *
+     * @return array<string, mixed>
+     */
+    public function startTyping(string $to): array;
+
+    /**
+     * Stop typing indicator.
+     *
+     * @return array<string, mixed>
+     */
+    public function stopTyping(string $to): array;
+
+    /**
      * Upload media to WhatsApp.
      *
      * @return array{id: string}
