@@ -57,6 +57,7 @@ class WhatsAppDownloadMedia implements ShouldQueue
                 WhatsAppTranscribeAudio::dispatch($message);
             } else {
                 $message->markAsReady();
+                $this->triggerBatchProcessingIfImmediate($message);
             }
 
         } catch (Exception $e) {
@@ -67,6 +68,7 @@ class WhatsAppDownloadMedia implements ShouldQueue
 
             // Still mark as ready so batch can proceed
             $message->markAsReady();
+            $this->triggerBatchProcessingIfImmediate($message);
 
             throw $e;
         }
@@ -81,5 +83,18 @@ class WhatsAppDownloadMedia implements ShouldQueue
 
         // Mark as ready anyway so batch processing can continue
         $this->message->markAsReady();
+        $this->triggerBatchProcessingIfImmediate($this->message);
+    }
+
+    /**
+     * Trigger batch processing for immediate mode.
+     */
+    protected function triggerBatchProcessingIfImmediate(WhatsAppMessage $message): void
+    {
+        $batch = $message->batch;
+
+        if ($batch && $message->phone->isImmediateMode() && $batch->isCollecting()) {
+            WhatsAppProcessBatch::dispatch($batch);
+        }
     }
 }

@@ -62,6 +62,7 @@ class WhatsAppTranscribeAudio implements ShouldQueue
             ]);
 
             $message->markAsReady();
+            $this->triggerBatchProcessingIfImmediate($message);
 
             event(new AudioTranscribed($message));
 
@@ -73,6 +74,7 @@ class WhatsAppTranscribeAudio implements ShouldQueue
 
             // Still mark as ready - handler can work without transcription
             $message->markAsReady();
+            $this->triggerBatchProcessingIfImmediate($message);
         }
     }
 
@@ -85,5 +87,18 @@ class WhatsAppTranscribeAudio implements ShouldQueue
 
         // Mark as ready anyway so batch processing can continue
         $this->message->markAsReady();
+        $this->triggerBatchProcessingIfImmediate($this->message);
+    }
+
+    /**
+     * Trigger batch processing for immediate mode.
+     */
+    protected function triggerBatchProcessingIfImmediate(WhatsAppMessage $message): void
+    {
+        $batch = $message->batch;
+
+        if ($batch && $message->phone->isImmediateMode() && $batch->isCollecting()) {
+            WhatsAppProcessBatch::dispatch($batch);
+        }
     }
 }
