@@ -20,7 +20,7 @@ class WhatsAppCheckBatchReady implements ShouldQueue
     public function __construct(
         public WhatsAppMessageBatch $batch,
     ) {
-        $this->onQueue(config('whatsapp.queue.queue', 'whatsapp'));
+        $this->onQueue(config('whatsapp.queue.queue'));
         $this->onConnection(config('whatsapp.queue.connection'));
     }
 

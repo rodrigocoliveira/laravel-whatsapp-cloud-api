@@ -87,7 +87,7 @@ return [
     */
     'queue' => [
         'connection' => env('WHATSAPP_QUEUE_CONNECTION'),
-        'queue' => env('WHATSAPP_QUEUE_NAME', 'whatsapp'),
+        'queue' => env('WHATSAPP_QUEUE_NAME', 'default'),
     ],
 
     /*

@@ -25,7 +25,7 @@ class WhatsAppSyncTemplates implements ShouldQueue
     public function __construct(
         public WhatsAppPhone $phone,
     ) {
-        $this->onQueue(config('whatsapp.queue.queue', 'whatsapp'));
+        $this->onQueue(config('whatsapp.queue.queue'));
         $this->onConnection(config('whatsapp.queue.connection'));
     }
 

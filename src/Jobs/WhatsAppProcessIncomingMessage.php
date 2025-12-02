@@ -26,7 +26,7 @@ class WhatsAppProcessIncomingMessage implements ShouldQueue
     public function __construct(
         public WhatsAppMessage $message,
     ) {
-        $this->onQueue(config('whatsapp.queue.queue', 'whatsapp'));
+        $this->onQueue(config('whatsapp.queue.queue'));
         $this->onConnection(config('whatsapp.queue.connection'));
     }
 

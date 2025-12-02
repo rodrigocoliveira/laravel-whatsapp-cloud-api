@@ -302,7 +302,7 @@ The package uses Laravel's queue system for async processing. Configure in `conf
 ```php
 'queue' => [
     'connection' => env('WHATSAPP_QUEUE_CONNECTION'), // null uses default
-    'queue' => env('WHATSAPP_QUEUE_NAME', 'whatsapp'),
+    'queue' => env('WHATSAPP_QUEUE_NAME', 'default'),
 ],
 ```
 
