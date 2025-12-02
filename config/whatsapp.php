@@ -83,9 +83,12 @@ return [
     |--------------------------------------------------------------------------
     | Logging
     |--------------------------------------------------------------------------
+    | Set 'channel' to use a specific logging channel (must be defined in
+    | config/logging.php). Leave null to use Laravel's default logger.
     */
     'logging' => [
         'enabled' => true,
+        'channel' => null,
     ],
 
     /*
