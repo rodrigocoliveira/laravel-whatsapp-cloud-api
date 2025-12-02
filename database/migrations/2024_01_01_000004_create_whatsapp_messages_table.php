@@ -38,6 +38,8 @@ return new class extends Migration
             // Audio transcription
             $table->string('transcription_status')->nullable();
             $table->text('transcription')->nullable();
+            $table->string('transcription_language')->nullable();
+            $table->decimal('transcription_duration', 10, 2)->nullable();
 
             // Outbound delivery status
             $table->string('delivery_status')->nullable();

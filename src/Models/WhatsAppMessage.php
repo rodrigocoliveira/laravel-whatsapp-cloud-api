@@ -45,6 +45,8 @@ use Multek\LaravelWhatsAppCloud\Events\MessageReady;
  * @property int|null $media_size
  * @property string|null $transcription_status
  * @property string|null $transcription
+ * @property string|null $transcription_language
+ * @property float|null $transcription_duration
  * @property string|null $delivery_status
  * @property string|null $error_message
  * @property \Illuminate\Support\Carbon|null $sent_at
@@ -169,6 +171,8 @@ class WhatsAppMessage extends Model
         'media_size',
         'transcription_status',
         'transcription',
+        'transcription_language',
+        'transcription_duration',
         'delivery_status',
         'error_message',
         'sent_at',
@@ -184,6 +188,7 @@ class WhatsAppMessage extends Model
         'template_parameters' => 'array',
         'metadata' => 'array',
         'media_size' => 'integer',
+        'transcription_duration' => 'float',
         'sent_at' => 'datetime',
         'delivered_at' => 'datetime',
         'read_at' => 'datetime',
@@ -398,6 +403,16 @@ class WhatsAppMessage extends Model
     public function getTranscription(): ?string
     {
         return $this->transcription;
+    }
+
+    public function getTranscriptionLanguage(): ?string
+    {
+        return $this->transcription_language;
+    }
+
+    public function getTranscriptionDuration(): ?float
+    {
+        return $this->transcription_duration;
     }
 
     // Status helpers

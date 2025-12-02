@@ -24,7 +24,6 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property bool $auto_download_media
  * @property bool $transcription_enabled
  * @property string|null $transcription_service
- * @property string $transcription_language
  * @property array|null $allowed_message_types
  * @property string $on_disallowed_type
  * @property string|null $disallowed_type_reply
@@ -59,7 +58,6 @@ class WhatsAppPhone extends Model
         'auto_download_media',
         'transcription_enabled',
         'transcription_service',
-        'transcription_language',
         'allowed_message_types',
         'on_disallowed_type',
         'disallowed_type_reply',
@@ -84,7 +82,6 @@ class WhatsAppPhone extends Model
         'batch_max_messages' => 10,
         'auto_download_media' => true,
         'transcription_enabled' => false,
-        'transcription_language' => 'pt-BR',
         'on_disallowed_type' => 'ignore',
         'is_active' => true,
     ];

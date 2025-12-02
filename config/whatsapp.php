@@ -57,14 +57,25 @@ return [
     |--------------------------------------------------------------------------
     | Transcription Services
     |--------------------------------------------------------------------------
+    | Transcription converts audio messages to text. Language is auto-detected.
+    |
+    | Available services: 'openai', 'custom'
+    |
+    | For 'openai': requires openai-php/client package
+    |   composer require openai-php/client
+    |
+    | For 'custom': provide your own TranscriptionServiceInterface implementation
+    |   Set WHATSAPP_TRANSCRIPTION_CLASS to your class name
     */
     'transcription' => [
         'default_service' => env('WHATSAPP_TRANSCRIPTION_SERVICE', 'openai'),
-        'default_language' => 'pt-BR',
         'services' => [
             'openai' => [
                 'api_key' => env('OPENAI_API_KEY'),
-                'model' => 'whisper-1',
+                'model' => env('WHATSAPP_TRANSCRIPTION_MODEL', 'whisper-1'),
+            ],
+            'custom' => [
+                'class' => env('WHATSAPP_TRANSCRIPTION_CLASS'),
             ],
         ],
     ],
