@@ -535,7 +535,10 @@ class WhatsAppClient implements WhatsAppClientInterface
     protected function logOutgoing(array $payload): void
     {
         if (config('whatsapp.logging.enabled', true)) {
-            Log::channel('whatsapp')->debug('Outgoing WhatsApp message', [
+            $channel = config('whatsapp.logging.channel');
+            $logger = $channel ? Log::channel($channel) : Log::getFacadeRoot();
+
+            $logger->debug('Outgoing WhatsApp message', [
                 'phone_id' => $this->phone->phone_id,
                 'to' => $payload['to'] ?? null,
                 'type' => $payload['type'] ?? null,
