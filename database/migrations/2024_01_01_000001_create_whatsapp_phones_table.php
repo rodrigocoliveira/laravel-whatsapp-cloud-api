@@ -32,7 +32,6 @@ return new class extends Migration
             $table->boolean('auto_download_media')->default(true);
             $table->boolean('transcription_enabled')->default(false);
             $table->string('transcription_service')->nullable();
-            $table->string('transcription_language')->default('pt-BR');
 
             // Message type filtering
             $table->json('allowed_message_types')->nullable();

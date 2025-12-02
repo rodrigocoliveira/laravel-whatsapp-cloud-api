@@ -51,13 +51,14 @@ class WhatsAppTranscribeAudio implements ShouldQueue
 
         try {
             $audioPath = Storage::disk($message->local_media_disk)->path($message->local_media_path);
-            $language = $message->phone->transcription_language ?? 'pt-BR';
 
-            $text = $transcriptionService->transcribe($audioPath, $language);
+            $result = $transcriptionService->transcribe($audioPath);
 
             $message->update([
                 'transcription_status' => WhatsAppMessage::TRANSCRIPTION_STATUS_TRANSCRIBED,
-                'transcription' => $text,
+                'transcription' => $result->text,
+                'transcription_language' => $result->detectedLanguage,
+                'transcription_duration' => $result->duration,
             ]);
 
             $message->markAsReady();
