@@ -7,7 +7,9 @@ namespace Multek\LaravelWhatsAppCloud\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Log;
 use Multek\LaravelWhatsAppCloud\Exceptions\WebhookVerificationException;
+use Multek\LaravelWhatsAppCloud\Models\WhatsAppWebhookLog;
 use Multek\LaravelWhatsAppCloud\Support\WebhookProcessor;
 
 class WebhookController extends Controller
@@ -51,8 +53,22 @@ class WebhookController extends Controller
     {
         $payload = $request->all();
 
-        // Process the webhook asynchronously to respond quickly
-        $this->processor->process($payload);
+        // Log raw payload for debugging and auditing
+        $webhookLog = null;
+        try {
+            $webhookLog = WhatsAppWebhookLog::create(['payload' => $payload]);
+        } catch (\Throwable $e) {
+            Log::warning('Failed to log raw webhook payload', ['error' => $e->getMessage()]);
+        }
+
+        // Process the webhook
+        try {
+            $this->processor->process($payload);
+            $webhookLog?->markAsProcessed();
+        } catch (\Throwable $e) {
+            $webhookLog?->markAsFailed($e->getMessage());
+            Log::error('Webhook processing failed', ['error' => $e->getMessage()]);
+        }
 
         // Always respond with 200 OK quickly
         return response('EVENT_RECEIVED', 200);

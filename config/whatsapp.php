@@ -40,6 +40,7 @@ return [
         'app_secret' => env('WHATSAPP_APP_SECRET'),
         'path' => 'webhooks/whatsapp',
         'middleware' => ['api'],
+        'log_retention_days' => env('WHATSAPP_WEBHOOK_LOG_RETENTION_DAYS', 30),
     ],
 
     /*

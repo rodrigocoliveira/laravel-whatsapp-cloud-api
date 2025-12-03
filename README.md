@@ -88,6 +88,39 @@ https://yourdomain.com/webhooks/whatsapp
 
 The package handles both verification (GET) and incoming events (POST).
 
+### Webhook Logging
+
+All incoming webhook payloads are automatically stored in the `whatsapp_webhook_logs` table for debugging and auditing purposes. This helps you:
+
+- Debug issues by inspecting the exact payload Meta sent
+- Audit and replay webhooks if processing fails
+- Analyze edge cases in payload structures
+
+Configure retention in your `.env`:
+
+```env
+WHATSAPP_WEBHOOK_LOG_RETENTION_DAYS=30  # Default: 30 days
+```
+
+To prune old logs, add this to your `app/Console/Kernel.php` scheduler:
+
+```php
+use Multek\LaravelWhatsAppCloud\Models\WhatsAppWebhookLog;
+
+protected function schedule(Schedule $schedule): void
+{
+    $schedule->command('model:prune', [
+        '--model' => [WhatsAppWebhookLog::class],
+    ])->daily();
+}
+```
+
+Or run manually:
+
+```bash
+php artisan model:prune --model="Multek\LaravelWhatsAppCloud\Models\WhatsAppWebhookLog"
+```
+
 ## Usage
 
 ### Sending Messages
