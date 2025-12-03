@@ -358,8 +358,6 @@ class WhatsAppClient implements WhatsAppClientInterface
      * Start typing indicator and mark message as read.
      *
      * The typing indicator will be dismissed once you respond, or after 25 seconds.
-     *
-     * @return array{success: bool}
      */
     public function startTyping(string $messageId): array
     {
@@ -372,29 +370,7 @@ class WhatsAppClient implements WhatsAppClientInterface
             ],
         ]);
 
-        $result = $response->json();
-
-        // Log the result for debugging typing indicator issues
-        if (config('whatsapp.logging.enabled', true)) {
-            $channel = config('whatsapp.logging.channel');
-            $logger = $channel ? Log::channel($channel) : Log::getFacadeRoot();
-
-            if (! $response->successful() || ! ($result['success'] ?? false)) {
-                $logger->warning('WhatsApp typing indicator may have failed', [
-                    'phone_id' => $this->phone->phone_id,
-                    'message_id' => $messageId,
-                    'http_status' => $response->status(),
-                    'response' => $result,
-                ]);
-            } else {
-                $logger->debug('WhatsApp typing indicator started', [
-                    'phone_id' => $this->phone->phone_id,
-                    'message_id' => $messageId,
-                ]);
-            }
-        }
-
-        return $result;
+        return $response->json();
     }
 
     /**

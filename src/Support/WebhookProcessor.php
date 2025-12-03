@@ -6,7 +6,6 @@ namespace Multek\LaravelWhatsAppCloud\Support;
 
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
-use Multek\LaravelWhatsAppCloud\Client\WhatsAppClient;
 use Multek\LaravelWhatsAppCloud\Events\MessageFiltered;
 use Multek\LaravelWhatsAppCloud\Events\MessageReceived;
 use Multek\LaravelWhatsAppCloud\Jobs\WhatsAppProcessIncomingMessage;
@@ -165,21 +164,6 @@ class WebhookProcessor
 
         // Fire message received event
         event(new MessageReceived($message));
-
-        // Auto-start typing indicator if enabled (also marks message as read)
-        if ($phone->auto_typing_enabled) {
-            try {
-                $client = new WhatsAppClient($phone);
-                $client->startTyping($messageId);
-            } catch (\Exception $e) {
-                // Log but don't fail - typing is non-critical
-                Log::warning('Failed to start typing indicator', [
-                    'phone_id' => $phone->phone_id,
-                    'message_id' => $messageId,
-                    'error' => $e->getMessage(),
-                ]);
-            }
-        }
 
         // Check message type filtering
         if (! $phone->isMessageTypeAllowed($type)) {

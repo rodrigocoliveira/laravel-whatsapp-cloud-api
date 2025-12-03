@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Multek\LaravelWhatsAppCloud\DTOs;
 
 use Illuminate\Support\Collection;
+use Multek\LaravelWhatsAppCloud\Client\WhatsAppClient;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppConversation;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppMessage;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppMessageBatch;
@@ -273,5 +274,44 @@ readonly class IncomingMessageContext
         $config = $this->phone->handler_config ?? [];
 
         return $config[$key] ?? $default;
+    }
+
+    /**
+     * Start typing indicator for the most recent message.
+     *
+     * Call this when you're about to start processing/generating a response.
+     * The typing indicator will be dismissed once you send a message, or after 25 seconds.
+     *
+     * @return array{success: bool}|null Returns null if no messages in batch
+     */
+    public function startTyping(): ?array
+    {
+        $lastMessage = $this->getLastMessage();
+
+        if (! $lastMessage) {
+            return null;
+        }
+
+        $client = new WhatsAppClient($this->phone);
+
+        return $client->startTyping($lastMessage->message_id);
+    }
+
+    /**
+     * Mark the most recent message as read (without typing indicator).
+     *
+     * @return array{success: bool}|null Returns null if no messages in batch
+     */
+    public function markAsRead(): ?array
+    {
+        $lastMessage = $this->getLastMessage();
+
+        if (! $lastMessage) {
+            return null;
+        }
+
+        $client = new WhatsAppClient($this->phone);
+
+        return $client->markAsRead($lastMessage->message_id);
     }
 }
