@@ -109,6 +109,49 @@ readonly class IncomingMessageContext
     }
 
     /**
+     * Check if any media message failed to download.
+     */
+    public function hasFailedMediaDownloads(): bool
+    {
+        return $this->messages->contains(
+            fn (WhatsAppMessage $message) => $message->media_status === WhatsAppMessage::MEDIA_STATUS_FAILED
+        );
+    }
+
+    /**
+     * Get media messages that failed to download.
+     *
+     * @return Collection<int, WhatsAppMessage>
+     */
+    public function getFailedMediaDownloads(): Collection
+    {
+        return $this->messages->filter(
+            fn (WhatsAppMessage $message) => $message->media_status === WhatsAppMessage::MEDIA_STATUS_FAILED
+        );
+    }
+
+    /**
+     * Check if any message has processing errors (failed media download or transcription).
+     */
+    public function hasProcessingErrors(): bool
+    {
+        return $this->hasFailedMediaDownloads() || $this->hasFailedTranscriptions();
+    }
+
+    /**
+     * Get all messages with processing errors (failed media download or transcription).
+     *
+     * @return Collection<int, WhatsAppMessage>
+     */
+    public function getProcessingErrors(): Collection
+    {
+        return $this->messages->filter(
+            fn (WhatsAppMessage $message) => $message->media_status === WhatsAppMessage::MEDIA_STATUS_FAILED
+                || $message->transcription_status === WhatsAppMessage::TRANSCRIPTION_STATUS_FAILED
+        );
+    }
+
+    /**
      * Get messages of specific type.
      *
      * @return Collection<int, WhatsAppMessage>

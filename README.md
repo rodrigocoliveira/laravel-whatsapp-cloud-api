@@ -150,6 +150,29 @@ class SupportHandler implements MessageHandlerInterface
 {
     public function handle(IncomingMessageContext $context): void
     {
+        // Check for processing errors (failed media downloads or transcriptions)
+        if ($context->hasFailedMediaDownloads()) {
+            $context->reply(__('whatsapp.media_download_failed'));
+            return;
+        }
+
+        if ($context->hasFailedTranscriptions()) {
+            $context->reply(__('whatsapp.transcription_failed'));
+            return;
+        }
+
+        // Or check for any processing error generically
+        if ($context->hasProcessingErrors()) {
+            foreach ($context->getProcessingErrors() as $message) {
+                Log::warning('Processing error', [
+                    'message_id' => $message->id,
+                    'error' => $message->error_message,
+                ]);
+            }
+            $context->reply(__('whatsapp.processing_error'));
+            return;
+        }
+
         // Get text content from all messages in the batch
         $textContent = $context->getTextContent();
 
@@ -167,7 +190,7 @@ class SupportHandler implements MessageHandlerInterface
         $context->reply('Thanks for your message! We will get back to you soon.');
 
         // Or use the fluent builder for complex replies
-        $context->replyBuilder()
+        $context->replyWith()
             ->text('Here is your summary:')
             ->send();
     }
