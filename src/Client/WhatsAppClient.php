@@ -355,31 +355,19 @@ class WhatsAppClient implements WhatsAppClientInterface
     }
 
     /**
-     * Start typing indicator.
+     * Start typing indicator and mark message as read.
+     *
+     * The typing indicator will be dismissed once you respond, or after 25 seconds.
      */
-    public function startTyping(string $to): array
+    public function startTyping(string $messageId): array
     {
         $response = $this->http()->post($this->getMessagesEndpoint(), [
             'messaging_product' => 'whatsapp',
-            'recipient_type' => 'individual',
-            'to' => $this->normalizePhoneNumber($to),
-            'type' => 'typing',
-        ]);
-
-        return $response->json();
-    }
-
-    /**
-     * Stop typing indicator.
-     */
-    public function stopTyping(string $to): array
-    {
-        $response = $this->http()->post($this->getMessagesEndpoint(), [
-            'messaging_product' => 'whatsapp',
-            'recipient_type' => 'individual',
-            'to' => $this->normalizePhoneNumber($to),
-            'type' => 'typing',
-            'typing' => ['action' => 'stop'],
+            'status' => 'read',
+            'message_id' => $messageId,
+            'typing_indicator' => [
+                'type' => 'text',
+            ],
         ]);
 
         return $response->json();

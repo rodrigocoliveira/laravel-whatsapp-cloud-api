@@ -13,7 +13,6 @@ use Multek\LaravelWhatsAppCloud\Jobs\WhatsAppProcessIncomingMessage;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppConversation;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppMessage;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppPhone;
-use Multek\LaravelWhatsAppCloud\Support\PhoneNumberHelper;
 
 class WebhookProcessor
 {
@@ -167,16 +166,16 @@ class WebhookProcessor
         // Fire message received event
         event(new MessageReceived($message));
 
-        // Auto-start typing indicator if enabled
+        // Auto-start typing indicator if enabled (also marks message as read)
         if ($phone->auto_typing_enabled) {
             try {
                 $client = new WhatsAppClient($phone);
-                $client->startTyping($from);
+                $client->startTyping($messageId);
             } catch (\Exception $e) {
                 // Log but don't fail - typing is non-critical
                 Log::warning('Failed to start typing indicator', [
                     'phone_id' => $phone->phone_id,
-                    'to' => $from,
+                    'message_id' => $messageId,
                     'error' => $e->getMessage(),
                 ]);
             }
