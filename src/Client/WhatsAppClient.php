@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Log;
 use Multek\LaravelWhatsAppCloud\Exceptions\MediaDownloadException;
 use Multek\LaravelWhatsAppCloud\Exceptions\MessageSendException;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppPhone;
+use Multek\LaravelWhatsAppCloud\Support\PhoneNumberHelper;
 
 class WhatsAppClient implements WhatsAppClientInterface
 {
@@ -556,11 +557,11 @@ class WhatsAppClient implements WhatsAppClientInterface
     }
 
     /**
-     * Normalize phone number (remove + and spaces).
+     * Normalize phone number for Meta API (digits only, no + prefix).
      */
     protected function normalizePhoneNumber(string $phone): string
     {
-        return preg_replace('/[^0-9]/', '', $phone) ?? $phone;
+        return PhoneNumberHelper::toDigits($phone);
     }
 
     /**

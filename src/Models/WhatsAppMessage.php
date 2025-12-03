@@ -22,6 +22,7 @@ use Multek\LaravelWhatsAppCloud\DTOs\MessageContent\TextContent;
 use Multek\LaravelWhatsAppCloud\DTOs\MessageContent\UnknownContent;
 use Multek\LaravelWhatsAppCloud\DTOs\MessageContent\VideoContent;
 use Multek\LaravelWhatsAppCloud\Events\MessageReady;
+use Multek\LaravelWhatsAppCloud\Support\PhoneNumberHelper;
 
 /**
  * @property int $id
@@ -442,5 +443,21 @@ class WhatsAppMessage extends Model
             'status' => self::STATUS_FILTERED,
             'filtered_reason' => $reason,
         ]);
+    }
+
+    /**
+     * Normalize 'from' phone number to E.164 format when setting.
+     */
+    public function setFromAttribute(string $value): void
+    {
+        $this->attributes['from'] = PhoneNumberHelper::normalize($value);
+    }
+
+    /**
+     * Normalize 'to' phone number to E.164 format when setting.
+     */
+    public function setToAttribute(string $value): void
+    {
+        $this->attributes['to'] = PhoneNumberHelper::normalize($value);
     }
 }

@@ -8,6 +8,7 @@ use Multek\LaravelWhatsAppCloud\Client\WhatsAppClientInterface;
 use Multek\LaravelWhatsAppCloud\Jobs\WhatsAppSendMessage;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppMessage;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppPhone;
+use Multek\LaravelWhatsAppCloud\Support\PhoneNumberHelper;
 
 class MessageBuilder
 {
@@ -86,7 +87,8 @@ class MessageBuilder
 
     public function to(string $phone): self
     {
-        $this->to = $phone;
+        // Normalize phone number to E.164 format for consistent storage
+        $this->to = PhoneNumberHelper::normalize($phone);
 
         return $this;
     }
