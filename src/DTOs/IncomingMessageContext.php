@@ -87,6 +87,28 @@ readonly class IncomingMessageContext
     }
 
     /**
+     * Check if any audio message failed transcription.
+     */
+    public function hasFailedTranscriptions(): bool
+    {
+        return $this->messages->contains(
+            fn (WhatsAppMessage $message) => $message->transcription_status === WhatsAppMessage::TRANSCRIPTION_STATUS_FAILED
+        );
+    }
+
+    /**
+     * Get audio messages that failed transcription.
+     *
+     * @return Collection<int, WhatsAppMessage>
+     */
+    public function getFailedTranscriptions(): Collection
+    {
+        return $this->messages->filter(
+            fn (WhatsAppMessage $message) => $message->transcription_status === WhatsAppMessage::TRANSCRIPTION_STATUS_FAILED
+        );
+    }
+
+    /**
      * Get messages of specific type.
      *
      * @return Collection<int, WhatsAppMessage>

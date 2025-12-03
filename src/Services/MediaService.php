@@ -142,6 +142,10 @@ class MediaService implements MediaStorageInterface
             'text/plain' => 'txt',
         ];
 
-        return $mimeMap[$mimeType] ?? 'bin';
+        // Extract the base MIME type without parameters (e.g., "audio/ogg; codecs=opus" -> "audio/ogg")
+        $baseMimeType = $mimeType ? explode(';', $mimeType)[0] : null;
+        $baseMimeType = $baseMimeType ? trim($baseMimeType) : null;
+
+        return $mimeMap[$baseMimeType] ?? 'bin';
     }
 }
