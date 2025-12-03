@@ -183,8 +183,6 @@ class SupportHandler implements MessageHandlerInterface
 {
     public function handle(IncomingMessageContext $context): void
     {
-        // Show typing indicator when starting to process the response
-        $context->startTyping();
 
         // Check for processing errors (failed media downloads or transcriptions)
         if ($context->hasFailedMediaDownloads()) {

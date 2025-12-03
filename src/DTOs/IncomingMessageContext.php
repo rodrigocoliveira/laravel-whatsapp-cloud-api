@@ -277,27 +277,6 @@ readonly class IncomingMessageContext
     }
 
     /**
-     * Start typing indicator for the most recent message.
-     *
-     * Call this when you're about to start processing/generating a response.
-     * The typing indicator will be dismissed once you send a message, or after 25 seconds.
-     *
-     * @return array{success: bool}|null Returns null if no messages in batch
-     */
-    public function startTyping(): ?array
-    {
-        $lastMessage = $this->getLastMessage();
-
-        if (! $lastMessage) {
-            return null;
-        }
-
-        $client = new WhatsAppClient($this->phone);
-
-        return $client->startTyping($lastMessage->message_id);
-    }
-
-    /**
      * Mark the most recent message as read (without typing indicator).
      *
      * @return array{success: bool}|null Returns null if no messages in batch
