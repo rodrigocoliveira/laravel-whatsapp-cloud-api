@@ -7,6 +7,7 @@ namespace Multek\LaravelWhatsAppCloud\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Multek\LaravelWhatsAppCloud\Support\PhoneNumberHelper;
 
 /**
  * @property int $id
@@ -111,5 +112,13 @@ class WhatsAppConversation extends Model
     public function reopen(): void
     {
         $this->update(['status' => self::STATUS_ACTIVE]);
+    }
+
+    /**
+     * Normalize contact_phone to E.164 format when setting.
+     */
+    public function setContactPhoneAttribute(string $value): void
+    {
+        $this->attributes['contact_phone'] = PhoneNumberHelper::normalize($value);
     }
 }

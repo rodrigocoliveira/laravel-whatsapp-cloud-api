@@ -7,6 +7,7 @@ namespace Multek\LaravelWhatsAppCloud\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Multek\LaravelWhatsAppCloud\Support\PhoneNumberHelper;
 
 /**
  * @property int $id
@@ -146,5 +147,13 @@ class WhatsAppPhone extends Model
     public function isImmediateMode(): bool
     {
         return $this->processing_mode === 'immediate';
+    }
+
+    /**
+     * Normalize phone_number to E.164 format when setting.
+     */
+    public function setPhoneNumberAttribute(string $value): void
+    {
+        $this->attributes['phone_number'] = PhoneNumberHelper::normalize($value);
     }
 }

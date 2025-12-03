@@ -13,6 +13,7 @@ use Multek\LaravelWhatsAppCloud\Jobs\WhatsAppProcessIncomingMessage;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppConversation;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppMessage;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppPhone;
+use Multek\LaravelWhatsAppCloud\Support\PhoneNumberHelper;
 
 class WebhookProcessor
 {
@@ -107,6 +108,16 @@ class WebhookProcessor
 
         if (! $messageId || ! $from) {
             Log::warning('WhatsApp webhook message missing id or from', ['data' => $messageData]);
+
+            return;
+        }
+
+        // Normalize phone number to E.164 format for consistent storage
+        $from = PhoneNumberHelper::normalize($from);
+
+        // Check for duplicate
+        if (WhatsAppMessage::where('message_id', $messageId)->exists()) {
+            Log::debug('WhatsApp duplicate message ignored', ['message_id' => $messageId]);
 
             return;
         }

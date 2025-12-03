@@ -63,12 +63,12 @@ it('processes incoming text message', function () {
     $this->assertDatabaseHas('whatsapp_messages', [
         'type' => 'text',
         'direction' => 'inbound',
-        'from' => '5511999999999',
+        'from' => '+5511999999999', // Normalized to E.164 format
         'text_body' => 'Hello World',
     ]);
 
     $this->assertDatabaseHas('whatsapp_conversations', [
-        'contact_phone' => '5511999999999',
+        'contact_phone' => '+5511999999999', // Normalized to E.164 format
         'contact_name' => 'Test User',
     ]);
 });
