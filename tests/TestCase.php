@@ -151,4 +151,62 @@ abstract class TestCase extends BaseTestCase
             ],
         ];
     }
+
+    /**
+     * Get a sample status update webhook payload.
+     *
+     * @return array<string, mixed>
+     */
+    protected function getStatusWebhookPayload(string $messageId, string $status): array
+    {
+        $statusData = [
+            'id' => $messageId,
+            'status' => $status,
+            'timestamp' => (string) time(),
+            'recipient_id' => '5511999999999',
+        ];
+
+        // Add conversation data for sent status
+        if ($status === 'sent') {
+            $statusData['conversation'] = [
+                'id' => 'conversation_id',
+                'origin' => [
+                    'type' => 'user_initiated',
+                ],
+            ];
+        }
+
+        // Add error data for failed status
+        if ($status === 'failed') {
+            $statusData['errors'] = [
+                [
+                    'code' => 131047,
+                    'title' => 'Re-engagement message',
+                    'message' => 'Re-engagement message',
+                ],
+            ];
+        }
+
+        return [
+            'object' => 'whatsapp_business_account',
+            'entry' => [
+                [
+                    'id' => 'WHATSAPP_BUSINESS_ACCOUNT_ID',
+                    'changes' => [
+                        [
+                            'field' => 'messages',
+                            'value' => [
+                                'messaging_product' => 'whatsapp',
+                                'metadata' => [
+                                    'display_phone_number' => '15551234567',
+                                    'phone_number_id' => 'test_phone_id',
+                                ],
+                                'statuses' => [$statusData],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+    }
 }
