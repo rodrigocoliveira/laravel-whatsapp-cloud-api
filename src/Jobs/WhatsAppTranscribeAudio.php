@@ -49,8 +49,10 @@ class WhatsAppTranscribeAudio implements ShouldQueue
 
         $message->update(['transcription_status' => WhatsAppMessage::TRANSCRIPTION_STATUS_TRANSCRIBING]);
 
+        $tempPath = null;
+
         try {
-            $audioPath = Storage::disk($message->local_media_disk)->path($message->local_media_path);
+            $audioPath = $this->getAudioPath($message, $tempPath);
 
             $result = $transcriptionService->transcribe($audioPath);
 
@@ -75,7 +77,44 @@ class WhatsAppTranscribeAudio implements ShouldQueue
             // Still mark as ready - handler can work without transcription
             $message->markAsReady();
             $this->triggerBatchProcessingIfImmediate($message);
+        } finally {
+            // Clean up temp file if created
+            if ($tempPath !== null && file_exists($tempPath)) {
+                @unlink($tempPath);
+            }
         }
+    }
+
+    /**
+     * Get the audio file path, downloading from cloud storage if needed.
+     */
+    protected function getAudioPath(WhatsAppMessage $message, ?string &$tempPath): string
+    {
+        $disk = Storage::disk($message->local_media_disk);
+
+        // For cloud storage (S3, etc.), download to temp file first
+        if (! $this->isLocalDisk()) {
+            $extension = pathinfo($message->local_media_path, PATHINFO_EXTENSION);
+            $tempPath = sys_get_temp_dir().'/whatsapp_audio_'.uniqid().'.'.$extension;
+
+            file_put_contents($tempPath, $disk->get($message->local_media_path));
+
+            return $tempPath;
+        }
+
+        // For local disk, use the path directly
+        return $disk->path($message->local_media_path);
+    }
+
+    /**
+     * Check if the storage disk is a local filesystem.
+     */
+    protected function isLocalDisk(): bool
+    {
+        $diskName = $this->message->local_media_disk;
+        $driver = config("filesystems.disks.{$diskName}.driver");
+
+        return $driver === 'local';
     }
 
     public function failed(?\Throwable $exception): void
