@@ -13,6 +13,8 @@ use Multek\LaravelWhatsAppCloud\Console\Commands\ProcessStaleBatchesCommand;
 use Multek\LaravelWhatsAppCloud\Console\Commands\SyncTemplatesCommand;
 use Multek\LaravelWhatsAppCloud\Contracts\MediaStorageInterface;
 use Multek\LaravelWhatsAppCloud\Contracts\TranscriptionServiceInterface;
+use Multek\LaravelWhatsAppCloud\Models\WhatsAppPhone;
+use Multek\LaravelWhatsAppCloud\Observers\WhatsAppPhoneObserver;
 use Multek\LaravelWhatsAppCloud\Services\MediaService;
 use Multek\LaravelWhatsAppCloud\Services\TranscriptionService;
 
@@ -40,6 +42,12 @@ class WhatsAppServiceProvider extends ServiceProvider
         $this->loadRoutes();
         $this->registerCommands();
         $this->registerSchedule();
+        $this->registerObservers();
+    }
+
+    protected function registerObservers(): void
+    {
+        WhatsAppPhone::observe(WhatsAppPhoneObserver::class);
     }
 
     protected function publishConfig(): void

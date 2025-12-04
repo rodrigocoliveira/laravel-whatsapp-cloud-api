@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Multek\LaravelWhatsAppCloud\Support;
 
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Multek\LaravelWhatsAppCloud\Client\WhatsAppClient;
 use Multek\LaravelWhatsAppCloud\Events\MessageFiltered;
@@ -65,10 +66,14 @@ class WebhookProcessor
             return;
         }
 
-        // Find the phone
-        $phone = WhatsAppPhone::where('phone_id', $phoneNumberId)
-            ->where('is_active', true)
-            ->first();
+        // Find the phone (cached for 5 minutes)
+        $phone = Cache::remember(
+            "whatsapp:phone:{$phoneNumberId}",
+            300,
+            fn () => WhatsAppPhone::where('phone_id', $phoneNumberId)
+                ->where('is_active', true)
+                ->first()
+        );
 
         if (! $phone) {
             Log::warning('WhatsApp webhook for unknown phone', ['phone_id' => $phoneNumberId]);

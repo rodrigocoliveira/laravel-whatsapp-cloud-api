@@ -26,7 +26,7 @@ class WhatsAppCheckBatchReady implements ShouldQueue
 
     public function handle(): void
     {
-        $batch = $this->batch->fresh();
+        $batch = $this->batch->fresh(['phone']);
 
         if (! $batch) {
             return;

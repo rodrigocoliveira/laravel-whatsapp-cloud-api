@@ -32,7 +32,7 @@ class WhatsAppDownloadMedia implements ShouldQueue
 
     public function handle(MediaService $mediaService): void
     {
-        $message = $this->message;
+        $message = $this->message->loadMissing(['phone', 'batch']);
 
         // Skip if media already downloaded
         if ($message->media_status === WhatsAppMessage::MEDIA_STATUS_DOWNLOADED) {

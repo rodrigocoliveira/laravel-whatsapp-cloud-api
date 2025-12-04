@@ -33,7 +33,7 @@ class WhatsAppTranscribeAudio implements ShouldQueue
 
     public function handle(TranscriptionService $transcriptionService): void
     {
-        $message = $this->message;
+        $message = $this->message->loadMissing(['phone', 'batch']);
 
         // Skip if already transcribed
         if ($message->transcription_status === WhatsAppMessage::TRANSCRIPTION_STATUS_TRANSCRIBED) {

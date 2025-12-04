@@ -32,7 +32,7 @@ class WhatsAppProcessIncomingMessage implements ShouldQueue
 
     public function handle(): void
     {
-        $message = $this->message;
+        $message = $this->message->loadMissing(['phone', 'conversation']);
         $phone = $message->phone;
 
         // Skip if message is not in received status

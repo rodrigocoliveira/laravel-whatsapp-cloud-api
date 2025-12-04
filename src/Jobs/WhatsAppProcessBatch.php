@@ -51,6 +51,7 @@ class WhatsAppProcessBatch implements ShouldQueue
             $messages = $batch->messages()
                 ->where('status', WhatsAppMessage::STATUS_READY)
                 ->orderBy('created_at')
+                ->with(['phone', 'conversation', 'batch'])
                 ->get();
 
             // Build context
