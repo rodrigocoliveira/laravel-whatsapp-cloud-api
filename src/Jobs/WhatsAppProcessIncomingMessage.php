@@ -47,19 +47,12 @@ class WhatsAppProcessIncomingMessage implements ShouldQueue
             return;
         }
 
-        // Find or create batch for this conversation
-        $batch = $this->findOrCreateBatch($message);
-
-        // Associate message with batch
-        $message->update(['whatsapp_message_batch_id' => $batch->id]);
-
-        // Update batch window
-        $processAfter = Carbon::now()->addSeconds($phone->batch_window_seconds);
-        $batch->update(['process_after' => $processAfter]);
+        // Find or create batch and associate message atomically
+        $batch = $this->findOrCreateBatchAndAssociateMessage($message);
 
         // Dispatch delayed job to check if batch is ready
         WhatsAppCheckBatchReady::dispatch($batch)
-            ->delay($processAfter->addSecond());
+            ->delay($batch->process_after->copy()->addSecond());
 
         // Handle media download if needed
         if ($message->hasMedia() && $phone->auto_download_media) {
@@ -106,32 +99,55 @@ class WhatsAppProcessIncomingMessage implements ShouldQueue
     }
 
     /**
-     * Find or create a batch for the message's conversation.
+     * Find or create a batch and associate the message atomically.
      *
-     * We look for 'collecting' batches first. If a batch is currently 'processing',
-     * we create a new one - the message will be queued for the next batch cycle.
+     * This ensures batch creation, message association, and window update
+     * all happen in a single transaction to prevent race conditions.
      */
-    protected function findOrCreateBatch(WhatsAppMessage $message): WhatsAppMessageBatch
+    protected function findOrCreateBatchAndAssociateMessage(WhatsAppMessage $message): WhatsAppMessageBatch
     {
         return DB::transaction(function () use ($message) {
+            $phone = $message->phone;
+
             // Try to find an existing collecting batch
             $batch = WhatsAppMessageBatch::lockForUpdate()
                 ->where('whatsapp_conversation_id', $message->whatsapp_conversation_id)
                 ->where('status', WhatsAppMessageBatch::STATUS_COLLECTING)
                 ->first();
 
+            $now = Carbon::now();
+
             if ($batch) {
-                return $batch;
+                // Associate message with existing batch
+                $message->update(['whatsapp_message_batch_id' => $batch->id]);
+
+                // Calculate new process_after, but cap it to prevent infinite extension
+                // Max window = first_message_at + batch_max_window_seconds (default 30s)
+                $maxWindowSeconds = $phone->batch_max_window_seconds ?? 30;
+                $maxProcessAfter = $batch->first_message_at->copy()->addSeconds($maxWindowSeconds);
+                $newProcessAfter = $now->copy()->addSeconds($phone->batch_window_seconds);
+
+                // Use the earlier of the two
+                $processAfter = $newProcessAfter->lt($maxProcessAfter) ? $newProcessAfter : $maxProcessAfter;
+
+                $batch->update(['process_after' => $processAfter]);
+
+                return $batch->fresh();
             }
 
-            // Create new batch
-            return WhatsAppMessageBatch::create([
+            // Create new batch with message associated
+            $batch = WhatsAppMessageBatch::create([
                 'whatsapp_phone_id' => $message->whatsapp_phone_id,
                 'whatsapp_conversation_id' => $message->whatsapp_conversation_id,
                 'status' => WhatsAppMessageBatch::STATUS_COLLECTING,
-                'first_message_at' => $message->created_at,
-                'process_after' => Carbon::now()->addSeconds($message->phone->batch_window_seconds),
+                'first_message_at' => $message->created_at ?? $now,
+                'process_after' => $now->copy()->addSeconds($phone->batch_window_seconds),
             ]);
+
+            // Associate message with new batch
+            $message->update(['whatsapp_message_batch_id' => $batch->id]);
+
+            return $batch;
         });
     }
 }

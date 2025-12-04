@@ -36,19 +36,52 @@ class WhatsAppProcessBatch implements ShouldQueue
 
     public function handle(): void
     {
-        // Use atomic update to prevent double processing (race condition safe)
-        $updated = DB::table('whatsapp_message_batches')
-            ->where('id', $this->batch->id)
-            ->where('status', WhatsAppMessageBatch::STATUS_COLLECTING)
-            ->update(['status' => WhatsAppMessageBatch::STATUS_PROCESSING]);
+        // Use a transaction with locking to ensure atomic check-and-update
+        // This prevents race conditions in chronological order verification
+        $batch = DB::transaction(function () {
+            // Lock this batch and all batches for the same conversation
+            $batch = WhatsAppMessageBatch::lockForUpdate()
+                ->with(['phone', 'conversation'])
+                ->find($this->batch->id);
 
-        // If no rows updated, batch was already processing/completed
-        if ($updated === 0) {
+            if (! $batch) {
+                return null;
+            }
+
+            // Skip if not in collecting status
+            if ($batch->status !== WhatsAppMessageBatch::STATUS_COLLECTING) {
+                return null;
+            }
+
+            // Check if there's an older batch still pending for this conversation
+            // This check is now atomic with the status update
+            $olderPendingBatch = WhatsAppMessageBatch::where('whatsapp_conversation_id', $batch->whatsapp_conversation_id)
+                ->where('id', '<', $batch->id)
+                ->whereIn('status', [
+                    WhatsAppMessageBatch::STATUS_COLLECTING,
+                    WhatsAppMessageBatch::STATUS_PROCESSING,
+                ])
+                ->lockForUpdate()
+                ->exists();
+
+            if ($olderPendingBatch) {
+                // Return a marker to indicate we need to reschedule
+                return 'reschedule';
+            }
+
+            // Atomically update status to processing
+            $batch->update(['status' => WhatsAppMessageBatch::STATUS_PROCESSING]);
+
+            return $batch->fresh(['phone', 'conversation']);
+        });
+
+        // Handle reschedule case (outside transaction)
+        if ($batch === 'reschedule') {
+            WhatsAppCheckBatchReady::dispatch($this->batch)
+                ->delay(now()->addSeconds(10));
+
             return;
         }
-
-        // Refresh the batch to get updated status
-        $batch = $this->batch->fresh(['phone', 'conversation']);
 
         if (! $batch) {
             return;
@@ -90,12 +123,34 @@ class WhatsAppProcessBatch implements ShouldQueue
 
             event(new BatchProcessed($batch, $context));
 
+            // Trigger next batch in queue for this conversation (if any)
+            $this->triggerNextBatch($batch);
+
         } catch (Exception $e) {
             $batch->markAsFailed($e->getMessage());
+
+            // Still trigger next batch even on failure
+            $this->triggerNextBatch($this->batch);
 
             report($e);
 
             throw $e;
+        }
+    }
+
+    /**
+     * Trigger the next pending batch for the same conversation.
+     */
+    protected function triggerNextBatch(WhatsAppMessageBatch $completedBatch): void
+    {
+        $nextBatch = WhatsAppMessageBatch::where('whatsapp_conversation_id', $completedBatch->whatsapp_conversation_id)
+            ->where('id', '>', $completedBatch->id)
+            ->where('status', WhatsAppMessageBatch::STATUS_COLLECTING)
+            ->orderBy('id')
+            ->first();
+
+        if ($nextBatch) {
+            WhatsAppCheckBatchReady::dispatch($nextBatch);
         }
     }
 
@@ -122,5 +177,8 @@ class WhatsAppProcessBatch implements ShouldQueue
     public function failed(?\Throwable $exception): void
     {
         $this->batch->markAsFailed($exception?->getMessage() ?? 'Unknown error');
+
+        // Trigger next batch even on failure so it doesn't get stuck
+        $this->triggerNextBatch($this->batch);
     }
 }

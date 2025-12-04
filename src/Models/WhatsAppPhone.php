@@ -22,6 +22,7 @@ use Multek\LaravelWhatsAppCloud\Support\PhoneNumberHelper;
  * @property string $processing_mode
  * @property int $batch_window_seconds
  * @property int $batch_max_messages
+ * @property int $batch_max_window_seconds
  * @property bool $auto_download_media
  * @property bool $transcription_enabled
  * @property string|null $transcription_service
@@ -57,6 +58,7 @@ class WhatsAppPhone extends Model
         'processing_mode',
         'batch_window_seconds',
         'batch_max_messages',
+        'batch_max_window_seconds',
         'auto_download_media',
         'transcription_enabled',
         'transcription_service',
@@ -78,12 +80,14 @@ class WhatsAppPhone extends Model
         'metadata' => 'array',
         'batch_window_seconds' => 'integer',
         'batch_max_messages' => 'integer',
+        'batch_max_window_seconds' => 'integer',
     ];
 
     protected $attributes = [
         'processing_mode' => 'batch',
         'batch_window_seconds' => 3,
         'batch_max_messages' => 10,
+        'batch_max_window_seconds' => 30,
         'auto_download_media' => true,
         'transcription_enabled' => false,
         'auto_typing_enabled' => true,
