@@ -107,6 +107,9 @@ class WhatsAppProcessIncomingMessage implements ShouldQueue
 
     /**
      * Find or create a batch for the message's conversation.
+     *
+     * We look for 'collecting' batches first. If a batch is currently 'processing',
+     * we create a new one - the message will be queued for the next batch cycle.
      */
     protected function findOrCreateBatch(WhatsAppMessage $message): WhatsAppMessageBatch
     {

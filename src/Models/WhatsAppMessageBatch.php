@@ -103,9 +103,10 @@ class WhatsAppMessageBatch extends Model
      * Check if the batch should be processed.
      *
      * Conditions:
-     * 1. Process window has elapsed
-     * 2. All messages are in 'ready' status
-     * 3. OR max messages reached
+     * 1. Batch must be in 'collecting' status
+     * 2. Batch must have at least one message
+     * 3. All messages must be in 'ready' or 'processed' status
+     * 4. Either: process window has elapsed OR max messages reached
      */
     public function shouldProcess(): bool
     {
@@ -113,27 +114,60 @@ class WhatsAppMessageBatch extends Model
             return false;
         }
 
+        // Must have messages to process
+        if (! $this->hasMessages()) {
+            return false;
+        }
+
+        // All messages must be ready
+        if (! $this->allMessagesReady()) {
+            return false;
+        }
+
         $phone = $this->phone;
         $messageCount = $this->messages()->count();
 
-        // Check max messages
+        // Process if max messages reached
         if ($messageCount >= $phone->batch_max_messages) {
-            return $this->allMessagesReady();
+            return true;
         }
 
-        // Check window elapsed
-        if (Carbon::now()->gte($this->process_after)) {
-            return $this->allMessagesReady();
-        }
-
-        return false;
+        // Process if window has elapsed
+        return Carbon::now()->gte($this->process_after);
     }
 
+    /**
+     * Check if batch has any messages.
+     */
+    public function hasMessages(): bool
+    {
+        return $this->messages()->exists();
+    }
+
+    /**
+     * Check if all messages are ready for processing.
+     */
     public function allMessagesReady(): bool
     {
         return $this->messages()
-            ->whereNotIn('status', ['ready', 'processed'])
+            ->whereNotIn('status', [
+                WhatsAppMessage::STATUS_READY,
+                WhatsAppMessage::STATUS_PROCESSED,
+            ])
             ->doesntExist();
+    }
+
+    /**
+     * Get count of messages that are still being processed (media download, transcription).
+     */
+    public function pendingMessagesCount(): int
+    {
+        return $this->messages()
+            ->whereIn('status', [
+                WhatsAppMessage::STATUS_RECEIVED,
+                WhatsAppMessage::STATUS_PROCESSING,
+            ])
+            ->count();
     }
 
     public function markAsProcessing(): void

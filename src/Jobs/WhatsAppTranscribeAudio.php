@@ -64,7 +64,7 @@ class WhatsAppTranscribeAudio implements ShouldQueue
             ]);
 
             $message->markAsReady();
-            $this->triggerBatchProcessingIfImmediate($message);
+            $this->checkBatchProcessing($message);
 
             event(new AudioTranscribed($message));
 
@@ -76,7 +76,7 @@ class WhatsAppTranscribeAudio implements ShouldQueue
 
             // Still mark as ready - handler can work without transcription
             $message->markAsReady();
-            $this->triggerBatchProcessingIfImmediate($message);
+            $this->checkBatchProcessing($message);
         } finally {
             // Clean up temp file if created
             if ($tempPath !== null && file_exists($tempPath)) {
@@ -119,6 +119,8 @@ class WhatsAppTranscribeAudio implements ShouldQueue
 
     public function failed(?\Throwable $exception): void
     {
+        $this->message->loadMissing(['phone', 'batch']);
+
         $this->message->update([
             'transcription_status' => WhatsAppMessage::TRANSCRIPTION_STATUS_FAILED,
             'error_message' => $exception?->getMessage(),
@@ -126,17 +128,29 @@ class WhatsAppTranscribeAudio implements ShouldQueue
 
         // Mark as ready anyway so batch processing can continue
         $this->message->markAsReady();
-        $this->triggerBatchProcessingIfImmediate($this->message);
+        $this->checkBatchProcessing($this->message);
     }
 
     /**
-     * Trigger batch processing for immediate mode.
+     * Check if batch should be processed after message becomes ready.
      */
-    protected function triggerBatchProcessingIfImmediate(WhatsAppMessage $message): void
+    protected function checkBatchProcessing(WhatsAppMessage $message): void
     {
         $batch = $message->batch;
 
-        if ($batch && $message->phone->isImmediateMode() && $batch->isCollecting()) {
+        if (! $batch || ! $batch->isCollecting()) {
+            return;
+        }
+
+        // For immediate mode, dispatch directly
+        if ($message->phone->isImmediateMode()) {
+            WhatsAppProcessBatch::dispatch($batch);
+
+            return;
+        }
+
+        // For batch mode, check if batch should process now
+        if ($batch->shouldProcess()) {
             WhatsAppProcessBatch::dispatch($batch);
         }
     }

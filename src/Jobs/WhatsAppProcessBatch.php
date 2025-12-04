@@ -10,6 +10,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
 use Multek\LaravelWhatsAppCloud\Contracts\MessageHandlerInterface;
 use Multek\LaravelWhatsAppCloud\DTOs\IncomingMessageContext;
 use Multek\LaravelWhatsAppCloud\Events\BatchProcessed;
@@ -35,14 +36,23 @@ class WhatsAppProcessBatch implements ShouldQueue
 
     public function handle(): void
     {
-        $batch = $this->batch;
+        // Use atomic update to prevent double processing (race condition safe)
+        $updated = DB::table('whatsapp_message_batches')
+            ->where('id', $this->batch->id)
+            ->where('status', WhatsAppMessageBatch::STATUS_COLLECTING)
+            ->update(['status' => WhatsAppMessageBatch::STATUS_PROCESSING]);
 
-        // Prevent double processing
-        if ($batch->status !== WhatsAppMessageBatch::STATUS_COLLECTING) {
+        // If no rows updated, batch was already processing/completed
+        if ($updated === 0) {
             return;
         }
 
-        $batch->markAsProcessing();
+        // Refresh the batch to get updated status
+        $batch = $this->batch->fresh(['phone', 'conversation']);
+
+        if (! $batch) {
+            return;
+        }
 
         try {
             $phone = $batch->phone;

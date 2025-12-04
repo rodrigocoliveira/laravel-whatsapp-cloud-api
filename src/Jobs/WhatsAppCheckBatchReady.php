@@ -40,7 +40,17 @@ class WhatsAppCheckBatchReady implements ShouldQueue
         // Check if should process
         if ($batch->shouldProcess()) {
             WhatsAppProcessBatch::dispatch($batch);
+
+            return;
         }
-        // If not ready, another delayed job was dispatched by a newer message
+
+        // If batch has pending messages (still downloading/transcribing),
+        // schedule another check in a few seconds
+        if ($batch->pendingMessagesCount() > 0) {
+            self::dispatch($batch)
+                ->delay(now()->addSeconds(5));
+        }
+        // Otherwise, if window hasn't elapsed yet, another check was
+        // already scheduled by the latest incoming message
     }
 }
