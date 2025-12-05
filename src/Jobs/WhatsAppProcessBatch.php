@@ -127,12 +127,9 @@ class WhatsAppProcessBatch implements ShouldQueue
             $this->triggerNextBatch($batch);
 
         } catch (Exception $e) {
+            // Mark batch as failed but don't trigger next batch here
+            // The failed() method will handle triggering the next batch
             $batch->markAsFailed($e->getMessage());
-
-            // Still trigger next batch even on failure
-            $this->triggerNextBatch($this->batch);
-
-            report($e);
 
             throw $e;
         }

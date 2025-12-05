@@ -61,13 +61,11 @@ class WhatsAppSendMessage implements ShouldQueue
             event(new MessageSent($message));
 
         } catch (Exception $e) {
+            // Only update error message, don't mark as failed yet - let retries happen
+            // The failed() method will mark as failed and fire event after all retries exhausted
             $message->update([
-                'status' => WhatsAppMessage::STATUS_FAILED,
-                'delivery_status' => WhatsAppMessage::DELIVERY_STATUS_FAILED,
                 'error_message' => $e->getMessage(),
             ]);
-
-            event(new MessageFailed($message, $e->getMessage()));
 
             throw $e;
         }
