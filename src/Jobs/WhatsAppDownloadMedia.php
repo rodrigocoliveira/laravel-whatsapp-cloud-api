@@ -61,14 +61,12 @@ class WhatsAppDownloadMedia implements ShouldQueue
             }
 
         } catch (Exception $e) {
+            // Update error message but don't mark as ready yet - let retries happen
+            // The failed() method will mark as ready after all retries are exhausted
             $message->update([
                 'media_status' => WhatsAppMessage::MEDIA_STATUS_FAILED,
                 'error_message' => $e->getMessage(),
             ]);
-
-            // Still mark as ready so batch can proceed
-            $message->markAsReady();
-            $this->checkBatchProcessing($message);
 
             throw $e;
         }

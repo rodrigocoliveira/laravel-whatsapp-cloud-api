@@ -69,14 +69,14 @@ class WhatsAppTranscribeAudio implements ShouldQueue
             event(new AudioTranscribed($message));
 
         } catch (Exception $e) {
+            // Update error message but don't mark as ready yet - let retries happen
+            // The failed() method will mark as ready after all retries are exhausted
             $message->update([
                 'transcription_status' => WhatsAppMessage::TRANSCRIPTION_STATUS_FAILED,
                 'error_message' => $e->getMessage(),
             ]);
 
-            // Still mark as ready - handler can work without transcription
-            $message->markAsReady();
-            $this->checkBatchProcessing($message);
+            throw $e;
         } finally {
             // Clean up temp file if created
             if ($tempPath !== null && file_exists($tempPath)) {

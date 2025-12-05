@@ -324,6 +324,226 @@ Each message is processed immediately as it arrives.
 'processing_mode' => 'immediate',
 ```
 
+## Batch Processing Architecture
+
+Understanding how messages flow through the system helps configure it correctly.
+
+### Flow Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                           MESSAGE PROCESSING FLOW                               │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+  WhatsApp User                        Your Server
+       │
+       │  Sends message (text, audio, image, etc.)
+       ▼
+┌──────────────┐
+│   Meta API   │──────────────────────────────────────────────────────────────────┐
+└──────────────┘                                                                  │
+                                                                                  ▼
+                                                                    ┌──────────────────────┐
+                                                                    │  WebhookController   │
+                                                                    │  (validates sig)     │
+                                                                    └──────────┬───────────┘
+                                                                               │
+                                                                               ▼
+                                                                    ┌──────────────────────┐
+                                                                    │  WebhookProcessor    │
+                                                                    │  • Creates Message   │
+                                                                    │  • Creates Convo     │
+                                                                    └──────────┬───────────┘
+                                                                               │
+                                                                               ▼
+                                                              ┌────────────────────────────────┐
+                                                              │ WhatsAppProcessIncomingMessage │
+                                                              │ (Job - runs async on queue)    │
+                                                              └────────────────┬───────────────┘
+                                                                               │
+                                              ┌────────────────────────────────┴────────────────────────────────┐
+                                              │                                                                 │
+                                              ▼                                                                 ▼
+                                    ┌───────────────────┐                                             ┌───────────────────┐
+                                    │  IMMEDIATE MODE   │                                             │    BATCH MODE     │
+                                    └─────────┬─────────┘                                             └─────────┬─────────┘
+                                              │                                                                 │
+                                              │                                                                 ▼
+                                              │                                                   ┌───────────────────────────┐
+                                              │                                                   │ Find/Create Batch         │
+                                              │                                                   │ • Atomic transaction      │
+                                              │                                                   │ • Lock for update         │
+                                              │                                                   │ • Set process_after       │
+                                              │                                                   └─────────────┬─────────────┘
+                                              │                                                                 │
+                                              └─────────────────────────┬───────────────────────────────────────┘
+                                                                        │
+                                                           ┌────────────┴────────────┐
+                                                           │                         │
+                                                           ▼                         ▼
+                                                   ┌───────────────┐         ┌───────────────┐
+                                                   │  Has Media?   │         │   No Media    │
+                                                   │     YES       │         │               │
+                                                   └───────┬───────┘         └───────┬───────┘
+                                                           │                         │
+                                                           ▼                         │
+                                              ┌────────────────────────┐             │
+                                              │ WhatsAppDownloadMedia  │             │
+                                              │ (Job - downloads file) │             │
+                                              └────────────┬───────────┘             │
+                                                           │                         │
+                                              ┌────────────┴────────────┐            │
+                                              │                         │            │
+                                              ▼                         ▼            │
+                                      ┌───────────────┐         ┌───────────────┐    │
+                                      │ Audio + Trans │         │  Other Media  │    │
+                                      │   Enabled?    │         │   or Failed   │    │
+                                      └───────┬───────┘         └───────┬───────┘    │
+                                              │                         │            │
+                                              ▼                         │            │
+                                 ┌─────────────────────────┐            │            │
+                                 │ WhatsAppTranscribeAudio │            │            │
+                                 │ (Job - calls OpenAI)    │            │            │
+                                 └────────────┬────────────┘            │            │
+                                              │                         │            │
+                                              └────────────┬────────────┴────────────┘
+                                                           │
+                                                           ▼
+                                              ┌────────────────────────┐
+                                              │   message.markAsReady  │
+                                              │   status = 'ready'     │
+                                              └────────────┬───────────┘
+                                                           │
+                                                           ▼
+                                              ┌────────────────────────┐
+                                              │ WhatsAppCheckBatchReady│◄─────────── Scheduled check
+                                              │ • All messages ready?  │             (process_after + 1s)
+                                              │ • Window elapsed?      │
+                                              │ • Max messages?        │
+                                              └────────────┬───────────┘
+                                                           │
+                                          ┌────────────────┴────────────────┐
+                                          │                                 │
+                                          ▼                                 ▼
+                                  ┌───────────────┐                 ┌───────────────┐
+                                  │  NOT READY    │                 │    READY!     │
+                                  │ (still proc.) │                 │               │
+                                  └───────┬───────┘                 └───────┬───────┘
+                                          │                                 │
+                                          ▼                                 ▼
+                                ┌──────────────────┐             ┌──────────────────────┐
+                                │ Re-check in 5s   │             │  WhatsAppProcessBatch │
+                                │ (max 10 min)     │             │  • Chronological lock │
+                                └──────────────────┘             │  • Calls your Handler │
+                                                                 └──────────┬───────────┘
+                                                                            │
+                                                                            ▼
+                                                                 ┌──────────────────────┐
+                                                                 │  YourHandler::handle │
+                                                                 │  (your business code)│
+                                                                 └──────────────────────┘
+```
+
+### Key Concepts
+
+**Batch Window** (`batch_window_seconds`): Time to wait after the *last* message before processing. Each new message resets this timer, allowing users to send multiple messages that get grouped together.
+
+**Max Window** (`batch_max_window_seconds`): Maximum total time a batch can stay open. Prevents infinite extension when users keep sending messages. After this time, the batch processes regardless of new messages.
+
+**Process After**: The timestamp when a batch becomes eligible for processing. This is the *minimum* wait time - if messages are still downloading/transcribing, the batch waits until they're ready.
+
+**Message Status Flow**:
+```
+received → processing → ready → processed
+              │
+              └──► (downloading media / transcribing audio)
+```
+
+**Batch Status Flow**:
+```
+collecting → processing → completed
+                │
+                └──► failed (timeout or error)
+```
+
+### Timing Configuration
+
+| Config | Default | Description |
+|--------|---------|-------------|
+| `batch_window_seconds` | `3` | Seconds to wait after last message. Resets with each new message. |
+| `batch_max_window_seconds` | `30` | Maximum seconds a batch can stay open. Hard limit. |
+| `batch_max_messages` | `10` | Process immediately when this many messages are collected. |
+
+### Safety Mechanisms
+
+**1. Atomic Batch Creation**: Batch creation and message association happen in a database transaction with row locking, preventing race conditions when multiple messages arrive simultaneously.
+
+**2. Chronological Processing**: Batches for the same conversation are processed in order. Batch #2 waits for Batch #1 to complete, ensuring message ordering.
+
+**3. Timeout Protection** (10 minutes): If media download or transcription takes too long, messages are force-marked as ready with error flags. The batch processes with available data rather than waiting forever.
+
+**4. Graceful Degradation**: Failed downloads or transcriptions don't block processing. Your handler receives the messages with error flags so you can decide how to respond.
+
+### Example Scenarios
+
+**Scenario 1: User sends 3 quick texts**
+```
+00:00 - "Hi"        → Batch created, process_after = 00:03
+00:01 - "I need"    → Added to batch, process_after = 00:04
+00:02 - "help"      → Added to batch, process_after = 00:05
+00:05 - Window elapsed, all ready → Handler receives 3 messages
+```
+
+**Scenario 2: User sends text + audio (with transcription)**
+```
+00:00 - "Check this" (text)  → Batch created, message ready
+00:01 - [2min audio]         → Added to batch, starts download
+00:04 - Window elapsed BUT audio still processing → Waits
+00:15 - Download complete    → Starts transcription
+00:25 - Transcription done   → Message ready
+00:25 - All ready            → Handler receives text + audio with transcription
+```
+
+**Scenario 3: User keeps sending messages (max window protection)**
+```
+00:00 - Msg 1 → Batch created, process_after = 00:03
+00:02 - Msg 2 → process_after = 00:05
+00:04 - Msg 3 → process_after = 00:07
+...
+00:28 - Msg 15 → process_after would be 00:31, BUT max_window (30s) caps it at 00:30
+00:30 - Max window reached → Handler receives all 15 messages
+```
+
+**Scenario 4: Slow transcription with timeout**
+```
+00:00 - [Long audio]         → Batch created, starts download
+03:00 - Download complete    → Starts transcription
+10:00 - TIMEOUT (10 min)     → Message forced to ready with error
+10:00 - Handler receives message with transcription_status = 'failed'
+```
+
+### Recommended Configurations
+
+**For AI Chatbots** (collect context):
+```php
+'batch_window_seconds' => 5,       // Wait for user to finish typing
+'batch_max_window_seconds' => 60,  // Allow longer conversations
+'batch_max_messages' => 20,        // Higher limit for context
+'transcription_enabled' => true,   // Understand voice messages
+```
+
+**For Quick Support Bots** (fast responses):
+```php
+'batch_window_seconds' => 2,       // Quick turnaround
+'batch_max_window_seconds' => 15,  // Don't wait too long
+'batch_max_messages' => 5,         // Process smaller batches
+```
+
+**For Immediate Processing** (no batching):
+```php
+'processing_mode' => 'immediate',  // Each message processed alone
+```
+
 ## Message Type Filtering
 
 Control which message types are accepted:
