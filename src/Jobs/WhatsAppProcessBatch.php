@@ -77,8 +77,12 @@ class WhatsAppProcessBatch implements ShouldQueue
 
         // Handle reschedule case (outside transaction)
         if ($batch === 'reschedule') {
-            WhatsAppCheckBatchReady::dispatch($this->batch)
-                ->delay(now()->addSeconds(10));
+            // On sync queue, delay() is ignored and rescheduling would cause infinite recursion.
+            // Skip the reschedule - the batch will be picked up when the older batch completes.
+            if (! $this->isRunningOnSyncQueue()) {
+                WhatsAppCheckBatchReady::dispatch($this->batch)
+                    ->delay(now()->addSeconds(10));
+            }
 
             return;
         }
@@ -177,5 +181,15 @@ class WhatsAppProcessBatch implements ShouldQueue
 
         // Trigger next batch even on failure so it doesn't get stuck
         $this->triggerNextBatch($this->batch);
+    }
+
+    /**
+     * Check if the current job is running on the sync queue driver.
+     */
+    protected function isRunningOnSyncQueue(): bool
+    {
+        $connection = $this->job?->getConnectionName() ?? config('whatsapp.queue.connection') ?? config('queue.default');
+
+        return config("queue.connections.{$connection}.driver") === 'sync';
     }
 }

@@ -60,13 +60,24 @@ class WhatsAppCheckBatchReady implements ShouldQueue
         }
 
         // If batch has pending messages (still downloading/transcribing),
-        // schedule another check in a few seconds
-        if ($batch->pendingMessagesCount() > 0) {
+        // schedule another check in a few seconds.
+        // Skip on sync queue since delay() is ignored and would cause infinite recursion.
+        if ($batch->pendingMessagesCount() > 0 && ! $this->isRunningOnSyncQueue()) {
             self::dispatch($batch)
                 ->delay(now()->addSeconds(5));
         }
         // Otherwise, if window hasn't elapsed yet, another check was
         // already scheduled by the latest incoming message
+    }
+
+    /**
+     * Check if the current job is running on the sync queue driver.
+     */
+    protected function isRunningOnSyncQueue(): bool
+    {
+        $connection = $this->job?->getConnectionName() ?? config('whatsapp.queue.connection') ?? config('queue.default');
+
+        return config("queue.connections.{$connection}.driver") === 'sync';
     }
 
     /**
