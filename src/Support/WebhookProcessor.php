@@ -66,20 +66,25 @@ class WebhookProcessor
             return;
         }
 
-        // Find the phone (cached for 5 minutes)
-        $phone = Cache::remember(
+        // Find the phone (attributes cached for 5 minutes — caching the raw
+        // array instead of the Eloquent object avoids __PHP_Incomplete_Class
+        // when the cache outlives a deploy release)
+        $attributes = Cache::remember(
             "whatsapp:phone:{$phoneNumberId}",
             300,
             fn () => WhatsAppPhone::where('phone_id', $phoneNumberId)
                 ->where('is_active', true)
                 ->first()
+                ?->getAttributes()
         );
 
-        if (! $phone) {
+        if (! $attributes) {
             Log::warning('WhatsApp webhook for unknown phone', ['phone_id' => $phoneNumberId]);
 
             return;
         }
+
+        $phone = (new WhatsAppPhone)->newFromBuilder($attributes);
 
         // Process messages
         $messages = $value['messages'] ?? [];
