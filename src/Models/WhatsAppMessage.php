@@ -6,6 +6,7 @@ namespace Multek\LaravelWhatsAppCloud\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Multek\LaravelWhatsAppCloud\DTOs\MessageContent\AudioContent;
 use Multek\LaravelWhatsAppCloud\DTOs\MessageContent\ContactsContent;
@@ -50,14 +51,14 @@ use Multek\LaravelWhatsAppCloud\Support\PhoneNumberHelper;
  * @property float|null $transcription_duration
  * @property string|null $delivery_status
  * @property string|null $error_message
- * @property \Illuminate\Support\Carbon|null $sent_at
- * @property \Illuminate\Support\Carbon|null $delivered_at
- * @property \Illuminate\Support\Carbon|null $read_at
+ * @property Carbon|null $sent_at
+ * @property Carbon|null $delivered_at
+ * @property Carbon|null $read_at
  * @property string|null $template_name
  * @property array|null $template_parameters
  * @property array|null $metadata
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  * @property-read WhatsAppPhone $phone
  * @property-read WhatsAppConversation|null $conversation
  * @property-read WhatsAppMessageBatch|null $batch

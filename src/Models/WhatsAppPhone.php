@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Multek\LaravelWhatsAppCloud\Models;
 
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 use Multek\LaravelWhatsAppCloud\Support\PhoneNumberHelper;
 
 /**
@@ -32,13 +34,13 @@ use Multek\LaravelWhatsAppCloud\Support\PhoneNumberHelper;
  * @property string|null $disallowed_type_reply
  * @property bool $is_active
  * @property array|null $metadata
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
- * @property \Illuminate\Support\Carbon|null $deleted_at
- * @property-read \Illuminate\Database\Eloquent\Collection<int, WhatsAppConversation> $conversations
- * @property-read \Illuminate\Database\Eloquent\Collection<int, WhatsAppMessage> $messages
- * @property-read \Illuminate\Database\Eloquent\Collection<int, WhatsAppMessageBatch> $batches
- * @property-read \Illuminate\Database\Eloquent\Collection<int, WhatsAppTemplate> $templates
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * @property Carbon|null $deleted_at
+ * @property-read Collection<int, WhatsAppConversation> $conversations
+ * @property-read Collection<int, WhatsAppMessage> $messages
+ * @property-read Collection<int, WhatsAppMessageBatch> $batches
+ * @property-read Collection<int, WhatsAppTemplate> $templates
  */
 class WhatsAppPhone extends Model
 {

@@ -4,16 +4,18 @@ declare(strict_types=1);
 
 namespace Multek\LaravelWhatsAppCloud\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Prunable;
+use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
  * @property array $payload
  * @property bool $processed
  * @property string|null $error
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  */
 class WhatsAppWebhookLog extends Model
 {
@@ -38,7 +40,7 @@ class WhatsAppWebhookLog extends Model
      * Prunes logs older than configured retention days (default: 30 days).
      * Run `php artisan model:prune --model="Multek\LaravelWhatsAppCloud\Models\WhatsAppWebhookLog"` to prune.
      *
-     * @return \Illuminate\Database\Eloquent\Builder<static>
+     * @return Builder<static>
      */
     public function prunable()
     {

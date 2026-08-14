@@ -24,7 +24,7 @@ use Multek\LaravelWhatsAppCloud\WhatsAppManager;
  * @method static WhatsAppMessage removeReaction(string $messageId)
  * @method static array markAsRead(string $messageId)
  *
- * @see \Multek\LaravelWhatsAppCloud\WhatsAppManager
+ * @see WhatsAppManager
  */
 class WhatsApp extends Facade
 {

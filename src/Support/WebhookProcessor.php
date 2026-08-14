@@ -8,8 +8,12 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Multek\LaravelWhatsAppCloud\Client\WhatsAppClient;
+use Multek\LaravelWhatsAppCloud\Events\MessageDelivered;
+use Multek\LaravelWhatsAppCloud\Events\MessageFailed;
 use Multek\LaravelWhatsAppCloud\Events\MessageFiltered;
+use Multek\LaravelWhatsAppCloud\Events\MessageRead;
 use Multek\LaravelWhatsAppCloud\Events\MessageReceived;
+use Multek\LaravelWhatsAppCloud\Events\MessageSent;
 use Multek\LaravelWhatsAppCloud\Jobs\WhatsAppProcessIncomingMessage;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppConversation;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppMessage;
@@ -263,10 +267,10 @@ class WebhookProcessor
         // Fire appropriate event only if status actually changed
         if ($shouldFireEvent) {
             match ($status) {
-                'sent' => event(new \Multek\LaravelWhatsAppCloud\Events\MessageSent($message)),
-                'delivered' => event(new \Multek\LaravelWhatsAppCloud\Events\MessageDelivered($message)),
-                'read' => event(new \Multek\LaravelWhatsAppCloud\Events\MessageRead($message)),
-                'failed' => event(new \Multek\LaravelWhatsAppCloud\Events\MessageFailed(
+                'sent' => event(new MessageSent($message)),
+                'delivered' => event(new MessageDelivered($message)),
+                'read' => event(new MessageRead($message)),
+                'failed' => event(new MessageFailed(
                     $message,
                     $statusData['errors'][0]['message'] ?? 'Unknown error'
                 )),

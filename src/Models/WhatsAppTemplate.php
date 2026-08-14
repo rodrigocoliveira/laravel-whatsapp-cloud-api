@@ -6,6 +6,7 @@ namespace Multek\LaravelWhatsAppCloud\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
@@ -17,9 +18,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $status
  * @property array $components
  * @property string|null $rejection_reason
- * @property \Illuminate\Support\Carbon|null $last_synced_at
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property Carbon|null $last_synced_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  * @property-read WhatsAppPhone $phone
  */
 class WhatsAppTemplate extends Model
