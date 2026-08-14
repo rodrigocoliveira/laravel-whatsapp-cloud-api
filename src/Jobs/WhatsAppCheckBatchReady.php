@@ -123,7 +123,7 @@ class WhatsAppCheckBatchReady implements ShouldQueue
             'age_minutes' => $batch->created_at->diffInMinutes(now()),
         ]);
 
-        $batch->markAsFailed('Batch timeout: no messages became ready within ' . self::MAX_BATCH_AGE_MINUTES . ' minutes');
+        $batch->markAsFailed('Batch timeout: no messages became ready within '.self::MAX_BATCH_AGE_MINUTES.' minutes');
 
         // Trigger next batch so it doesn't get stuck waiting
         $this->triggerNextBatch($batch);

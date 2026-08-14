@@ -8,7 +8,6 @@ use Multek\LaravelWhatsAppCloud\Client\WhatsAppClientInterface;
 use Multek\LaravelWhatsAppCloud\Jobs\WhatsAppSendMessage;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppMessage;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppPhone;
-use Multek\LaravelWhatsAppCloud\Support\PhoneNumberHelper;
 
 class MessageBuilder
 {

@@ -7,6 +7,7 @@ namespace Multek\LaravelWhatsAppCloud\Jobs;
 use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
@@ -94,7 +95,7 @@ class WhatsAppProcessBatch implements ShouldQueue
         try {
             $phone = $batch->phone;
             $conversation = $batch->conversation;
-            /** @var \Illuminate\Database\Eloquent\Collection<int, WhatsAppMessage> $messages */
+            /** @var Collection<int, WhatsAppMessage> $messages */
             $messages = $batch->messages()
                 ->where('status', WhatsAppMessage::STATUS_READY)
                 ->orderBy('created_at')
