@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Storage;
 use Multek\LaravelWhatsAppCloud\DTOs\MessageContent\AudioContent;
 use Multek\LaravelWhatsAppCloud\DTOs\MessageContent\ContactsContent;
 use Multek\LaravelWhatsAppCloud\DTOs\MessageContent\DocumentContent;
+use Multek\LaravelWhatsAppCloud\DTOs\MessageContent\FlowResponseContent;
 use Multek\LaravelWhatsAppCloud\DTOs\MessageContent\ImageContent;
 use Multek\LaravelWhatsAppCloud\DTOs\MessageContent\InteractiveReplyContent;
 use Multek\LaravelWhatsAppCloud\DTOs\MessageContent\LocationContent;
@@ -265,12 +266,14 @@ class WhatsAppMessage extends Model
                 address: $content['address'] ?? null,
             ),
             self::TYPE_CONTACTS => new ContactsContent(contacts: $content['contacts'] ?? []),
-            self::TYPE_INTERACTIVE, self::TYPE_BUTTON => new InteractiveReplyContent(
-                replyType: $content['type'] ?? 'button_reply',
-                id: $content['button_reply']['id'] ?? $content['list_reply']['id'] ?? '',
-                title: $content['button_reply']['title'] ?? $content['list_reply']['title'] ?? '',
-                description: $content['list_reply']['description'] ?? null,
-            ),
+            self::TYPE_INTERACTIVE, self::TYPE_BUTTON => ($content['type'] ?? null) === 'nfm_reply'
+                ? $this->buildFlowResponseContent($content)
+                : new InteractiveReplyContent(
+                    replyType: $content['type'] ?? 'button_reply',
+                    id: $content['button_reply']['id'] ?? $content['list_reply']['id'] ?? '',
+                    title: $content['button_reply']['title'] ?? $content['list_reply']['title'] ?? '',
+                    description: $content['list_reply']['description'] ?? null,
+                ),
             self::TYPE_REACTION => new ReactionContent(
                 messageId: $content['message_id'] ?? '',
                 emoji: $content['emoji'] ?? '',
@@ -349,7 +352,53 @@ class WhatsAppMessage extends Model
 
     public function isInteractiveReply(): bool
     {
-        return in_array($this->type, [self::TYPE_INTERACTIVE, self::TYPE_BUTTON], true);
+        return in_array($this->type, [self::TYPE_INTERACTIVE, self::TYPE_BUTTON], true)
+            && ! $this->isFlowResponse();
+    }
+
+    /**
+     * Whether this message is a submitted WhatsApp Flow (`nfm_reply`).
+     */
+    public function isFlowResponse(): bool
+    {
+        return $this->type === self::TYPE_INTERACTIVE
+            && ($this->content['type'] ?? null) === 'nfm_reply';
+    }
+
+    /**
+     * The decoded data submitted through a WhatsApp Flow.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function getFlowData(): ?array
+    {
+        if (! $this->isFlowResponse()) {
+            return null;
+        }
+
+        return $this->buildFlowResponseContent($this->content ?? [])->data;
+    }
+
+    /**
+     * @param  array<string, mixed>  $content
+     */
+    protected function buildFlowResponseContent(array $content): FlowResponseContent
+    {
+        $reply = $content['nfm_reply'] ?? [];
+        $responseJson = $reply['response_json'] ?? null;
+
+        $data = is_string($responseJson) ? json_decode($responseJson, true) : null;
+        $data = is_array($data) ? $data : [];
+
+        $flowToken = $data['flow_token'] ?? null;
+
+        return new FlowResponseContent(
+            data: $data,
+            responseJson: is_string($responseJson) ? $responseJson : null,
+            body: $reply['body'] ?? null,
+            name: $reply['name'] ?? null,
+            flowToken: is_string($flowToken) ? $flowToken : null,
+        );
     }
 
     public function isReaction(): bool

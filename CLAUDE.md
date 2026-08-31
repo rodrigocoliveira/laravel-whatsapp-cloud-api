@@ -39,7 +39,7 @@ src/
 ├── Console/Commands/         # Artisan commands (install, sync-templates)
 ├── Contracts/                # Interfaces for extensibility
 ├── DTOs/                     # Data transfer objects
-│   └── MessageContent/       # Typed DTOs for each message type (14 types)
+│   └── MessageContent/       # Typed DTOs for each message type (15 types)
 ├── Events/                   # Observable Laravel events
 ├── Exceptions/               # Custom exception hierarchy
 ├── Facades/                  # WhatsApp facade
@@ -153,6 +153,7 @@ The `IncomingMessageContext` provides:
 - `$context->getTextContent()` - Aggregated text from all messages
 - `$context->getMedia()` - Messages with downloaded media
 - `$context->getTranscriptions()` - Audio transcriptions
+- `$context->getFlowResponses()` / `$context->getFlowData()` - Submitted WhatsApp Flow forms
 - `$context->reply($text)` - Quick text reply
 - `$context->replyBuilder()` - Full `MessageBuilder` for complex replies
 

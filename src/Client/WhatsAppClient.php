@@ -276,6 +276,69 @@ class WhatsAppClient implements WhatsAppClientInterface
     }
 
     /**
+     * Send a WhatsApp Flow CTA message.
+     *
+     * @param  array<string, mixed>  $data  Initial screen data (only used with $screen)
+     * @return array<string, mixed>
+     */
+    public function sendFlow(
+        string $to,
+        string $body,
+        string $flowId,
+        string $flowCta,
+        string $flowToken,
+        ?string $screen = null,
+        array $data = [],
+        string $flowAction = 'navigate',
+        ?string $mode = null,
+        ?string $header = null,
+        ?string $footer = null,
+    ): array {
+        $parameters = [
+            'flow_message_version' => '3',
+            'flow_id' => $flowId,
+            'flow_token' => $flowToken,
+            'flow_cta' => $flowCta,
+            'flow_action' => $flowAction,
+        ];
+
+        if ($screen !== null) {
+            $parameters['flow_action_payload'] = array_filter([
+                'screen' => $screen,
+                'data' => $data ?: null,
+            ], fn ($value) => $value !== null);
+        }
+
+        if ($mode !== null) {
+            $parameters['mode'] = $mode;
+        }
+
+        $interactive = [
+            'type' => 'flow',
+            'body' => ['text' => $body],
+            'action' => [
+                'name' => 'flow',
+                'parameters' => $parameters,
+            ],
+        ];
+
+        if ($header) {
+            $interactive['header'] = ['type' => 'text', 'text' => $header];
+        }
+        if ($footer) {
+            $interactive['footer'] = ['text' => $footer];
+        }
+
+        return $this->sendMessage([
+            'messaging_product' => 'whatsapp',
+            'recipient_type' => 'individual',
+            'to' => $this->normalizePhoneNumber($to),
+            'type' => 'interactive',
+            'interactive' => $interactive,
+        ]);
+    }
+
+    /**
      * Send location.
      */
     public function sendLocation(string $to, float $latitude, float $longitude, ?string $name = null, ?string $address = null): array

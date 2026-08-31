@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Multek\LaravelWhatsAppCloud\Support;
 
+use Illuminate\Support\Str;
 use Multek\LaravelWhatsAppCloud\Client\WhatsAppClientInterface;
 use Multek\LaravelWhatsAppCloud\Jobs\WhatsAppSendMessage;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppMessage;
@@ -69,6 +70,22 @@ class MessageBuilder
     protected ?string $ctaButtonText = null;
 
     protected ?string $ctaUrl = null;
+
+    // Flow
+    protected ?string $flowId = null;
+
+    protected ?string $flowCta = null;
+
+    protected ?string $flowTokenValue = null;
+
+    protected ?string $flowScreen = null;
+
+    /** @var array<string, mixed> */
+    protected array $flowData = [];
+
+    protected string $flowAction = 'navigate';
+
+    protected ?string $flowMode = null;
 
     // Contacts
     /** @var array<int, array<string, mixed>> */
@@ -316,6 +333,63 @@ class MessageBuilder
         return $this;
     }
 
+    // Flow
+    /**
+     * Send a WhatsApp Flow CTA message.
+     */
+    public function flow(string $body, string $flowId, string $cta): self
+    {
+        $this->messageType = 'flow';
+        $this->interactiveBody = $body;
+        $this->flowId = $flowId;
+        $this->flowCta = $cta;
+
+        return $this;
+    }
+
+    /**
+     * Set the flow token echoed back on the flow response. Generated when omitted.
+     */
+    public function flowToken(string $token): self
+    {
+        $this->flowTokenValue = $token;
+
+        return $this;
+    }
+
+    /**
+     * Set the initial screen and its data.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function flowScreen(string $screen, array $data = []): self
+    {
+        $this->flowScreen = $screen;
+        $this->flowData = $data;
+
+        return $this;
+    }
+
+    /**
+     * Use `data_exchange` instead of `navigate` (endpoint-backed flows).
+     */
+    public function flowDataExchange(): self
+    {
+        $this->flowAction = 'data_exchange';
+
+        return $this;
+    }
+
+    /**
+     * Send an unpublished flow (`draft` mode) for testing.
+     */
+    public function flowMode(string $mode): self
+    {
+        $this->flowMode = $mode;
+
+        return $this;
+    }
+
     // Contacts
     /**
      * @param  array<int, array<string, mixed>>  $contacts
@@ -425,6 +499,19 @@ class MessageBuilder
                 $this->interactiveHeader,
                 $this->interactiveFooter
             ),
+            'flow' => $this->client->sendFlow(
+                $this->to,
+                $this->interactiveBody ?? '',
+                $this->flowId ?? '',
+                $this->flowCta ?? '',
+                $this->resolveFlowToken(),
+                $this->flowScreen,
+                $this->flowData,
+                $this->flowAction,
+                $this->flowMode,
+                $this->interactiveHeader,
+                $this->interactiveFooter
+            ),
             'contacts' => $this->client->sendContacts(
                 $this->to,
                 $this->contacts
@@ -523,10 +610,18 @@ class MessageBuilder
         ]);
     }
 
+    /**
+     * Return the configured flow token, generating a stable one on first use.
+     */
+    protected function resolveFlowToken(): string
+    {
+        return $this->flowTokenValue ??= (string) Str::uuid();
+    }
+
     protected function resolveMessageTypeForRecord(): string
     {
         return match ($this->messageType) {
-            'buttons', 'list', 'cta_url' => 'interactive',
+            'buttons', 'list', 'cta_url', 'flow' => 'interactive',
             default => $this->messageType ?? 'text',
         };
     }
@@ -572,6 +667,19 @@ class MessageBuilder
                 'button_text' => $this->ctaButtonText,
                 'url' => $this->ctaUrl,
             ],
+            'flow' => array_filter([
+                'type' => 'flow',
+                'body' => $this->interactiveBody,
+                'header' => $this->interactiveHeader,
+                'footer' => $this->interactiveFooter,
+                'flow_id' => $this->flowId,
+                'flow_token' => $this->resolveFlowToken(),
+                'flow_cta' => $this->flowCta,
+                'flow_action' => $this->flowAction,
+                'mode' => $this->flowMode,
+                'screen' => $this->flowScreen,
+                'data' => $this->flowData ?: null,
+            ], fn ($value) => $value !== null),
             'contacts' => ['contacts' => $this->contacts],
             'reaction' => ['message_id' => $this->reactionMessageId, 'emoji' => $this->reactionEmoji],
             'template' => [

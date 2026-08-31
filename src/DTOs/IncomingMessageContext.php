@@ -183,6 +183,29 @@ readonly class IncomingMessageContext
     }
 
     /**
+     * Get submitted WhatsApp Flow responses (`nfm_reply`).
+     *
+     * @return Collection<int, WhatsAppMessage>
+     */
+    public function getFlowResponses(): Collection
+    {
+        return $this->messages->filter(fn (WhatsAppMessage $message) => $message->isFlowResponse());
+    }
+
+    /**
+     * Get the decoded data of every submitted flow in the batch.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function getFlowData(): array
+    {
+        return $this->getFlowResponses()
+            ->map(fn (WhatsAppMessage $message) => $message->getFlowData() ?? [])
+            ->values()
+            ->all();
+    }
+
+    /**
      * Get contact card messages.
      *
      * @return Collection<int, WhatsAppMessage>

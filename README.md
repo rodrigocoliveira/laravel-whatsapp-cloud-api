@@ -160,6 +160,16 @@ WhatsApp::phone('support')
     ->button('btn_no', 'No')
     ->send();
 
+// Send a WhatsApp Flow (native in-conversation form)
+WhatsApp::phone('support')
+    ->to('+5511999999999')
+    ->flow('Complete your signup', flowId: '1234567890', cta: 'Sign up')
+    ->flowToken('signup-42')            // optional, a UUID is generated otherwise
+    ->flowScreen('WELCOME', ['name' => 'Rodrigo'])
+    ->header('Signup')
+    ->footer('Takes one minute')
+    ->send();
+
 // Send a location
 WhatsApp::phone('support')
     ->to('+5511999999999')
@@ -240,6 +250,7 @@ use Multek\LaravelWhatsAppCloud\DTOs\MessageContent\TextContent;
 use Multek\LaravelWhatsAppCloud\DTOs\MessageContent\ImageContent;
 use Multek\LaravelWhatsAppCloud\DTOs\MessageContent\LocationContent;
 use Multek\LaravelWhatsAppCloud\DTOs\MessageContent\InteractiveReplyContent;
+use Multek\LaravelWhatsAppCloud\DTOs\MessageContent\FlowResponseContent;
 
 foreach ($context->messages as $message) {
     $content = $message->getTypedContent();
@@ -264,8 +275,42 @@ foreach ($context->messages as $message) {
         $buttonId = $content->id;
         $buttonTitle = $content->title;
     }
+
+    if ($content instanceof FlowResponseContent) {
+        $submitted = $content->data;          // decoded response_json
+        $email = $content->get('email');
+        $flowToken = $content->flowToken;
+    }
 }
 ```
+
+### Receiving WhatsApp Flow Responses
+
+When the user submits a Flow, WhatsApp sends an `nfm_reply` interactive message. The
+package decodes the `response_json` payload for you:
+
+```php
+public function handle(IncomingMessageContext $context): void
+{
+    foreach ($context->getFlowResponses() as $message) {
+        $data = $message->getFlowData();   // ['flow_token' => ..., 'name' => ..., ...]
+
+        User::create([
+            'name' => $data['name'],
+            'email' => $data['email'],
+        ]);
+    }
+
+    // Or grab the decoded payload of every flow in the batch at once
+    $payloads = $context->getFlowData();
+}
+```
+
+The `flow_token` you set with `->flowToken()` is echoed back inside the response data,
+so you can correlate a submission with whatever you were collecting.
+
+Endpoint-backed (`data_exchange`) Flows, which call your server between screens, are not
+supported yet — `->flowDataExchange()` only sets the action on the CTA message.
 
 ### Listening to Events
 
