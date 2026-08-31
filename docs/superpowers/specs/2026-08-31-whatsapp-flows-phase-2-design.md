@@ -36,12 +36,12 @@ Meta posts `{encrypted_flow_data, encrypted_aes_key, initial_vector}`, all base6
    (`~iv`, byte by byte), and return base64 of `ciphertext || tag` as a plain-text body
    (not JSON).
 
-PHP has everything needed: `openssl_private_decrypt` with `OPENSSL_PKCS1_OAEP_PADDING`
-does not allow choosing SHA-256, so use `openssl_pkey_get_private` plus the `sodium`/
-`phpseclib` route, or `openssl_private_decrypt` via a `RSA/ECB/OAEPWithSHA-256AndMGF1Padding`
-implementation. **Decide this during implementation with a spike** — it is the one
-genuinely uncertain piece. `phpseclib/phpseclib` v3 supports OAEP with an explicit hash
-and MGF1 hash and is the likely answer; adding it is an acceptable dependency.
+**Resolved by spike (2026-08-31): no extra dependency is needed.** `openssl_private_decrypt`
+cannot choose the OAEP digest, but decrypting with `OPENSSL_NO_PADDING` yields the raw
+encoded message, and EME-OAEP decoding with SHA-256 (MGF1 included) is ~25 lines of PHP
+over `hash()`. Verified round-trip against the `openssl pkeyutl` CLI encrypting with
+`rsa_oaep_md:sha256`. AES-128-GCM and the flipped IV work directly through
+`openssl_encrypt`/`openssl_decrypt`. `phpseclib` is therefore NOT added.
 
 Error contract: any decryption failure must return HTTP 421 (Meta then refreshes the
 public key), and any other failure HTTP 500 with no body. Never leak details.

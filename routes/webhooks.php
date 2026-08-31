@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
+use Multek\LaravelWhatsAppCloud\Http\Controllers\FlowEndpointController;
 use Multek\LaravelWhatsAppCloud\Http\Controllers\WebhookController;
 use Multek\LaravelWhatsAppCloud\Http\Middleware\VerifyWhatsAppSignature;
 
@@ -21,3 +22,10 @@ Route::middleware($middleware)
             ->middleware(VerifyWhatsAppSignature::class)
             ->name('whatsapp.webhook.handle');
     });
+
+// Flow data-exchange endpoint. It is guarded at runtime by
+// `whatsapp.flows.endpoint_enabled` and authenticated by the payload encryption,
+// so it deliberately skips the webhook signature middleware.
+Route::middleware($middleware)
+    ->post($webhookPath.'/'.ltrim((string) config('whatsapp.flows.endpoint_path', 'flow'), '/'), FlowEndpointController::class)
+    ->name('whatsapp.flow.exchange');

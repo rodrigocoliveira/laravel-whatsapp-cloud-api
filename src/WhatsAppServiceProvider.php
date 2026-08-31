@@ -8,6 +8,7 @@ use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\ServiceProvider;
 use Multek\LaravelWhatsAppCloud\Client\WhatsAppClient;
 use Multek\LaravelWhatsAppCloud\Client\WhatsAppClientInterface;
+use Multek\LaravelWhatsAppCloud\Console\Commands\FlowKeyCommand;
 use Multek\LaravelWhatsAppCloud\Console\Commands\InstallCommand;
 use Multek\LaravelWhatsAppCloud\Console\Commands\ProcessStaleBatchesCommand;
 use Multek\LaravelWhatsAppCloud\Console\Commands\SyncTemplatesCommand;
@@ -76,6 +77,7 @@ class WhatsAppServiceProvider extends ServiceProvider
                 InstallCommand::class,
                 SyncTemplatesCommand::class,
                 ProcessStaleBatchesCommand::class,
+                FlowKeyCommand::class,
             ]);
         }
     }

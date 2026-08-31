@@ -309,8 +309,61 @@ public function handle(IncomingMessageContext $context): void
 The `flow_token` you set with `->flowToken()` is echoed back inside the response data,
 so you can correlate a submission with whatever you were collecting.
 
-Endpoint-backed (`data_exchange`) Flows, which call your server between screens, are not
-supported yet — `->flowDataExchange()` only sets the action on the CTA message.
+### Endpoint-Backed (`data_exchange`) Flows
+
+Flows whose screens call back to your server between steps need the encrypted
+data-exchange endpoint.
+
+**1. Generate a key pair and upload the public half to Meta:**
+
+```bash
+php artisan whatsapp:flow-key generate
+```
+
+Store the private key in `WHATSAPP_FLOW_PRIVATE_KEY` (an inline PEM or a path to a key
+file), then:
+
+```bash
+php artisan whatsapp:flow-key upload --phone=support
+```
+
+**2. Enable the endpoint** with `WHATSAPP_FLOW_ENDPOINT_ENABLED=true`. It is served at
+`webhooks/whatsapp/flow` and answers `404` while disabled. Register that URL as the
+endpoint URI of your Flow in the WhatsApp Manager.
+
+**3. Write a handler** implementing `FlowHandlerInterface` and point
+`whatsapp.flows.handler` at it. Health checks (`ping`) and client error notifications are
+answered by the package and never reach your handler.
+
+```php
+use Multek\LaravelWhatsAppCloud\Contracts\FlowHandlerInterface;
+use Multek\LaravelWhatsAppCloud\DTOs\Flows\FlowRequest;
+use Multek\LaravelWhatsAppCloud\DTOs\Flows\FlowResponse;
+
+class SignupFlowHandler implements FlowHandlerInterface
+{
+    public function handle(FlowRequest $request): FlowResponse
+    {
+        if ($request->screen === 'SIGNUP') {
+            $user = User::create([
+                'name' => $request->get('name'),
+                'email' => $request->get('email'),
+            ]);
+
+            return FlowResponse::complete($request->flowToken, ['user_id' => $user->id]);
+        }
+
+        return FlowResponse::screen('SIGNUP', ['countries' => Country::pluck('name')]);
+    }
+}
+```
+
+Send the flow with `->flowDataExchange()` so the first screen calls your endpoint.
+
+**How it is secured:** the endpoint has no signature check — authenticity comes from the
+encryption, since only Meta can encrypt with the public key you registered. Any payload
+that fails to decrypt is answered with `421`, which makes Meta refresh the public key. The
+private key is only ever read from config; per-phone keys are not supported.
 
 ### Listening to Events
 
@@ -615,6 +668,12 @@ php artisan whatsapp:sync-templates
 
 # Process stale/stuck batches (runs automatically every 5 min)
 php artisan whatsapp:process-stale-batches
+
+# Generate the RSA key pair for endpoint-backed Flows
+php artisan whatsapp:flow-key generate
+
+# Upload the Flow public key to Meta for a phone
+php artisan whatsapp:flow-key upload --phone=support
 ```
 
 ## Queue Configuration
