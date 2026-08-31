@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Http;
 use Multek\LaravelWhatsAppCloud\Client\WhatsAppClient;
+use Multek\LaravelWhatsAppCloud\Contracts\MessageHandlerInterface;
 use Multek\LaravelWhatsAppCloud\DTOs\IncomingMessageContext;
 use Multek\LaravelWhatsAppCloud\DTOs\MessageContent\FlowResponseContent;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppConversation;
@@ -271,3 +272,102 @@ it('exposes flow responses on the incoming message context', function () {
         ->and($context->getFlowResponses()->first()->is($flowMessage))->toBeTrue()
         ->and($context->getFlowData())->toBe([['flow_token' => 't', 'age' => 30]]);
 });
+
+it('delivers a submitted signup form to the phone handler end to end', function () {
+    config()->set('queue.default', 'sync');
+    config()->set('whatsapp.processing_mode', 'immediate');
+
+    $this->phone->update(['handler' => FlowSignupHandler::class, 'processing_mode' => 'immediate']);
+
+    FlowSignupHandler::$received = null;
+
+    $payload = [
+        'object' => 'whatsapp_business_account',
+        'entry' => [[
+            'id' => 'WABA',
+            'changes' => [[
+                'field' => 'messages',
+                'value' => [
+                    'messaging_product' => 'whatsapp',
+                    'metadata' => [
+                        'display_phone_number' => '15551234567',
+                        'phone_number_id' => 'test_phone_id',
+                    ],
+                    'contacts' => [[
+                        'profile' => ['name' => 'Test User'],
+                        'wa_id' => '5511999999999',
+                    ]],
+                    'messages' => [[
+                        'from' => '5511999999999',
+                        'id' => 'wamid.e2e',
+                        'timestamp' => (string) time(),
+                        'type' => 'interactive',
+                        'interactive' => [
+                            'type' => 'nfm_reply',
+                            'nfm_reply' => [
+                                'name' => 'flow',
+                                'body' => 'Sent',
+                                'response_json' => json_encode([
+                                    'flow_token' => 'signup-42',
+                                    'name' => 'Rodrigo',
+                                    'email' => 'rodrigo@example.com',
+                                ]),
+                            ],
+                        ],
+                    ]],
+                ],
+            ]],
+        ]],
+    ];
+
+    $this->postJson('/webhooks/whatsapp', $payload, [
+        'X-Hub-Signature-256' => $this->generateSignature($payload),
+    ])->assertOk();
+
+    expect(FlowSignupHandler::$received)->toBe([
+        'flow_token' => 'signup-42',
+        'name' => 'Rodrigo',
+        'email' => 'rodrigo@example.com',
+    ]);
+});
+
+it('sends a queued flow message from the stored record', function () {
+    config()->set('queue.default', 'sync');
+    Http::fake(['*' => Http::response(['messages' => [['id' => 'wamid.queued']]], 200)]);
+
+    $message = app(WhatsAppManager::class)
+        ->phone('test')
+        ->to('5511999999999')
+        ->flow('Complete seu cadastro', '1234567890', 'Cadastrar')
+        ->flowToken('signup-42')
+        ->flowScreen('WELCOME', ['name' => 'Rodrigo'])
+        ->queue();
+
+    Http::assertSent(function ($request) {
+        $parameters = $request->data()['interactive']['action']['parameters'];
+
+        expect($request->data()['interactive']['type'])->toBe('flow')
+            ->and($parameters['flow_id'])->toBe('1234567890')
+            ->and($parameters['flow_token'])->toBe('signup-42')
+            ->and($parameters['flow_cta'])->toBe('Cadastrar')
+            ->and($parameters['flow_action_payload'])->toBe([
+                'screen' => 'WELCOME',
+                'data' => ['name' => 'Rodrigo'],
+            ]);
+
+        return true;
+    });
+
+    expect($message->fresh()->message_id)->toBe('wamid.queued');
+});
+
+class FlowSignupHandler implements MessageHandlerInterface
+{
+    /** @var array<string, mixed>|null */
+    public static ?array $received = null;
+
+    public function handle(IncomingMessageContext $context): void
+    {
+        self::$received = $context->getFlowResponses()->first()?->getFlowData();
+    }
+}

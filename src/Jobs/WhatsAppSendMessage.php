@@ -148,6 +148,19 @@ class WhatsAppSendMessage implements ShouldQueue
                 $content['header'] ?? null,
                 $content['footer'] ?? null
             ),
+            'flow' => $client->sendFlow(
+                $to,
+                $content['body'] ?? '',
+                $content['flow_id'] ?? '',
+                $content['flow_cta'] ?? '',
+                $content['flow_token'] ?? '',
+                $content['screen'] ?? null,
+                $content['data'] ?? [],
+                $content['flow_action'] ?? 'navigate',
+                $content['mode'] ?? null,
+                $content['header'] ?? null,
+                $content['footer'] ?? null
+            ),
             default => throw new Exception("Unsupported interactive type: {$type}"),
         };
     }
