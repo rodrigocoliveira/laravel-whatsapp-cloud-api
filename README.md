@@ -16,7 +16,7 @@ A comprehensive Laravel package for integrating with the WhatsApp Cloud API. Sup
 ## Requirements
 
 - PHP 8.2+
-- Laravel 11.0+
+- Laravel 12.0+ (Laravel 11 reached end of security support in March 2026)
 
 ## Installation
 
