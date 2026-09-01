@@ -674,7 +674,18 @@ php artisan whatsapp:flow-key generate
 
 # Upload the Flow public key to Meta for a phone
 php artisan whatsapp:flow-key upload --phone=support
+
+# Smoke-test a flow against real traffic
+php artisan whatsapp:flow-test send --phone=support --flow-id=123 --to=5511999999999
+php artisan whatsapp:flow-test ping
 ```
+
+`whatsapp:flow-test send` delivers a real flow message (in `draft` mode by default, so the
+flow does not need publishing) and prints the wamid Meta returned, or the Graph API error
+if it was rejected. `whatsapp:flow-test ping` encrypts a health check the way Meta does and
+posts it to your own endpoint, proving the private key, the route and the response
+encryption line up — a `421` there means the configured key does not match the one
+uploaded to Meta.
 
 ## Queue Configuration
 
