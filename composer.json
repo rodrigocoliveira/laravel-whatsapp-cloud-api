@@ -1,7 +1,13 @@
 {
     "name": "multek/laravel-whatsapp-cloud",
     "description": "Enterprise-grade WhatsApp Cloud API integration for Laravel with multi-phone support, batch processing, and AI agent workflows.",
-    "keywords": ["laravel", "whatsapp", "cloud-api", "messaging", "ai-agent"],
+    "keywords": [
+        "laravel",
+        "whatsapp",
+        "cloud-api",
+        "messaging",
+        "ai-agent"
+    ],
     "license": "MIT",
     "authors": [
         {
@@ -10,13 +16,13 @@
     ],
     "require": {
         "php": "^8.2",
-        "illuminate/support": "^11.0|^12.0|^13.0",
-        "illuminate/http": "^11.0|^12.0|^13.0",
-        "illuminate/database": "^11.0|^12.0|^13.0",
-        "illuminate/queue": "^11.0|^12.0|^13.0"
+        "illuminate/support": "^12.0|^13.0",
+        "illuminate/http": "^12.0|^13.0",
+        "illuminate/database": "^12.0|^13.0",
+        "illuminate/queue": "^12.0|^13.0"
     },
     "require-dev": {
-        "orchestra/testbench": "^9.0|^10.0|^11.0",
+        "orchestra/testbench": "^10.0|^11.0",
         "pestphp/pest": "^2.0|^3.0|^4.0",
         "pestphp/pest-plugin-laravel": "^2.0|^3.0|^4.0",
         "laravel/pint": "^1.0",

@@ -129,6 +129,13 @@ Media: `MediaDownloaded`, `AudioTranscribed`
 2. Register in `WhatsAppServiceProvider::$commands`
 3. Add to README console commands section
 
+### Adding a WhatsApp Flow Screen Handler
+
+Endpoint-backed flows are served by `FlowEndpointController` at `webhooks/whatsapp/flow`,
+guarded by `whatsapp.flows.endpoint_enabled`. Implement `FlowHandlerInterface` and set
+`whatsapp.flows.handler`. `FlowEncryptionService` owns the RSA-OAEP/AES-GCM handshake;
+`ping` and `error` actions are answered by the controller, never by the handler.
+
 ### Adding a New Transcription Service
 
 1. Implement `TranscriptionServiceInterface` in `src/Services/Transcription/`
@@ -171,6 +178,9 @@ Key configuration options in `config/whatsapp.php`:
 | `transcription_enabled` | `false` | Auto-transcribe audio |
 | `webhook.verify_token` | env | Token for webhook verification |
 | `webhook.app_secret` | env | Secret for signature verification |
+| `flows.endpoint_enabled` | `false` | Serve the Flow data-exchange endpoint |
+| `flows.private_key` | env | Business private key (PEM or path) for Flow encryption |
+| `flows.handler` | env | `FlowHandlerInterface` implementation for dynamic Flows |
 | `media.storage_disk` | `local` | Laravel disk for media storage |
 | `media.storage_path` | `whatsapp/media` | Path on disk |
 

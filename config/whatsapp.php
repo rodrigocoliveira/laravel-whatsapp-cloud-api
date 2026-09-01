@@ -32,6 +32,28 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | WhatsApp Flows
+    |--------------------------------------------------------------------------
+    | Endpoint-backed ("data_exchange") flows call back to your server between
+    | screens. Static flows need none of this.
+    */
+    'flows' => [
+        // Enables the data-exchange route. Disabled endpoints answer 404.
+        'endpoint_enabled' => env('WHATSAPP_FLOW_ENDPOINT_ENABLED', false),
+
+        // Appended to the webhook path, e.g. webhooks/whatsapp/flow
+        'endpoint_path' => env('WHATSAPP_FLOW_ENDPOINT_PATH', 'flow'),
+
+        // The business private key: an inline PEM or a path to a key file.
+        'private_key' => env('WHATSAPP_FLOW_PRIVATE_KEY'),
+        'private_key_passphrase' => env('WHATSAPP_FLOW_PRIVATE_KEY_PASSPHRASE'),
+
+        // A class implementing FlowHandlerInterface.
+        'handler' => env('WHATSAPP_FLOW_HANDLER'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Webhook Configuration
     |--------------------------------------------------------------------------
     */
