@@ -64,17 +64,38 @@ it('answers a health check ping', function () {
         ->and($result['data'])->toBe(['data' => ['status' => 'active']]);
 });
 
-it('acknowledges a client error notification without calling the handler', function () {
+// Meta reports client-side errors on the regular actions, marking them only through
+// data.error / data.error_message — there is no dedicated "error" action.
+it('acknowledges a client error notification without calling the handler', function (string $action) {
     config()->set('whatsapp.flows.handler', ThrowingFlowHandler::class);
 
     $result = postFlowRequest([
         'version' => '3.0',
-        'action' => 'error',
-        'data' => ['error_message' => 'Something went wrong'],
+        'flow_token' => 'signup-42',
+        'action' => $action,
+        'data' => [
+            'error' => 'INVALID_ENCRYPTION',
+            'error_message' => 'Something went wrong',
+        ],
     ], $this->publicKey);
 
     expect($result['status'])->toBe(200)
         ->and($result['data'])->toBe(['data' => ['acknowledged' => true]]);
+})->with(['data_exchange', 'INIT']);
+
+it('does not mistake a legitimate error field in screen data for an error notification', function () {
+    config()->set('whatsapp.flows.handler', SignupFlowHandler::class);
+
+    SignupFlowHandler::$received = null;
+
+    postFlowRequest([
+        'version' => '3.0',
+        'action' => 'data_exchange',
+        'screen' => 'SIGNUP',
+        'data' => ['email' => 'rodrigo@example.com'],
+    ], $this->publicKey);
+
+    expect(SignupFlowHandler::$received)->not->toBeNull();
 });
 
 it('routes a data exchange request to the configured handler', function () {

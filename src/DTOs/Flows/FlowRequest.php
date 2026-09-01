@@ -44,8 +44,22 @@ readonly class FlowRequest
         return $this->action === 'ping';
     }
 
+    /**
+     * Client-side errors arrive on the regular actions (`data_exchange` or `INIT`)
+     * and are identified by the error fields in the payload, not by the action.
+     */
     public function isErrorNotification(): bool
     {
-        return $this->action === 'error';
+        return isset($this->data['error_message']) || isset($this->data['error']);
+    }
+
+    /**
+     * The error reported by the client, when this is an error notification.
+     */
+    public function errorMessage(): ?string
+    {
+        $message = $this->data['error_message'] ?? $this->data['error'] ?? null;
+
+        return is_string($message) ? $message : null;
     }
 }

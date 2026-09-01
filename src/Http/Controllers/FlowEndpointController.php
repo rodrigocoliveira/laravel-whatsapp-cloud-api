@@ -70,7 +70,12 @@ class FlowEndpointController extends Controller
         }
 
         if ($request->isErrorNotification()) {
-            Log::warning('WhatsApp Flow client error', ['data' => $request->data]);
+            Log::warning('WhatsApp Flow client error', [
+                'action' => $request->action,
+                'screen' => $request->screen,
+                'flow_token' => $request->flowToken,
+                'error' => $request->errorMessage(),
+            ]);
 
             return ['data' => ['acknowledged' => true]];
         }
