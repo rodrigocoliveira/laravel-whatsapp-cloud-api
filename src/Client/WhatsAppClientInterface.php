@@ -80,6 +80,26 @@ interface WhatsAppClientInterface
     public function sendCtaUrl(string $to, string $body, string $buttonText, string $url, ?string $header = null, ?string $footer = null): array;
 
     /**
+     * Send a WhatsApp Flow CTA message.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array{messages: array<int, array{id: string}>}
+     */
+    public function sendFlow(
+        string $to,
+        string $body,
+        string $flowId,
+        string $flowCta,
+        string $flowToken,
+        ?string $screen = null,
+        array $data = [],
+        string $flowAction = 'navigate',
+        ?string $mode = null,
+        ?string $header = null,
+        ?string $footer = null,
+    ): array;
+
+    /**
      * Send location.
      *
      * @return array{messages: array<int, array{id: string}>}
