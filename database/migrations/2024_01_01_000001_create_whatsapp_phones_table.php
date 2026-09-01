@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('phone_number');
             $table->string('display_name')->nullable();
             $table->string('business_account_id');
-            $table->string('access_token')->nullable();
+            $table->text('access_token')->nullable();
 
             // Handler configuration
             $table->string('handler')->nullable();
