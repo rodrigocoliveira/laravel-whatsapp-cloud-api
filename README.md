@@ -177,7 +177,18 @@ WhatsApp::phone('support')
     ->name('Sao Paulo')
     ->address('Sao Paulo, Brazil')
     ->send();
+
+// Send inside an existing conversation (addresses its contact and links the message to it)
+WhatsApp::phone('support')
+    ->conversation($conversation)
+    ->text('Following up on your order')
+    ->send();
 ```
+
+Every outbound message is linked to a `WhatsAppConversation`, resolved from the sending phone and
+the normalized recipient (created if none exists, so inbound and outbound land on the same thread),
+and `send()` fires `MessageSent` once the API call succeeds. `queue()` links the pending message the
+same way and fires `MessageSent` from the job after delivery.
 
 ### Creating a Message Handler
 

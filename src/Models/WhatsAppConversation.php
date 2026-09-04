@@ -65,7 +65,7 @@ class WhatsAppConversation extends Model
      */
     public function messages(): HasMany
     {
-        return $this->hasMany(WhatsAppMessage::class);
+        return $this->hasMany(WhatsAppMessage::class, 'whatsapp_conversation_id');
     }
 
     /**
@@ -73,7 +73,7 @@ class WhatsAppConversation extends Model
      */
     public function batches(): HasMany
     {
-        return $this->hasMany(WhatsAppMessageBatch::class);
+        return $this->hasMany(WhatsAppMessageBatch::class, 'whatsapp_conversation_id');
     }
 
     public function isActive(): bool

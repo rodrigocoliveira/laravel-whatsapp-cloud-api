@@ -102,7 +102,7 @@ class WhatsAppPhone extends Model
      */
     public function conversations(): HasMany
     {
-        return $this->hasMany(WhatsAppConversation::class);
+        return $this->hasMany(WhatsAppConversation::class, 'whatsapp_phone_id');
     }
 
     /**
@@ -110,7 +110,7 @@ class WhatsAppPhone extends Model
      */
     public function messages(): HasMany
     {
-        return $this->hasMany(WhatsAppMessage::class);
+        return $this->hasMany(WhatsAppMessage::class, 'whatsapp_phone_id');
     }
 
     /**
@@ -118,7 +118,7 @@ class WhatsAppPhone extends Model
      */
     public function batches(): HasMany
     {
-        return $this->hasMany(WhatsAppMessageBatch::class);
+        return $this->hasMany(WhatsAppMessageBatch::class, 'whatsapp_phone_id');
     }
 
     /**
@@ -126,7 +126,7 @@ class WhatsAppPhone extends Model
      */
     public function templates(): HasMany
     {
-        return $this->hasMany(WhatsAppTemplate::class);
+        return $this->hasMany(WhatsAppTemplate::class, 'whatsapp_phone_id');
     }
 
     public function getAccessTokenAttribute(?string $value): string
