@@ -6,13 +6,17 @@ namespace Multek\LaravelWhatsAppCloud\Support;
 
 use Illuminate\Support\Str;
 use Multek\LaravelWhatsAppCloud\Client\WhatsAppClientInterface;
+use Multek\LaravelWhatsAppCloud\Events\MessageSent;
 use Multek\LaravelWhatsAppCloud\Jobs\WhatsAppSendMessage;
+use Multek\LaravelWhatsAppCloud\Models\WhatsAppConversation;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppMessage;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppPhone;
 
 class MessageBuilder
 {
     protected ?string $to = null;
+
+    protected ?WhatsAppConversation $conversation = null;
 
     protected ?string $messageType = null;
 
@@ -105,6 +109,17 @@ class MessageBuilder
     {
         // Normalize phone number to E.164 format for consistent storage
         $this->to = PhoneNumberHelper::normalize($phone);
+
+        return $this;
+    }
+
+    /**
+     * Address the message to an existing conversation's contact and link it to that conversation.
+     */
+    public function conversation(WhatsAppConversation $conversation): self
+    {
+        $this->conversation = $conversation;
+        $this->to = $conversation->contact_phone;
 
         return $this;
     }
@@ -414,13 +429,21 @@ class MessageBuilder
 
     public function send(): WhatsAppMessage
     {
+        $this->ensureRecipient();
+
         $result = $this->executeApiCall();
 
-        return $this->createMessageRecord($result);
+        $message = $this->createMessageRecord($result);
+
+        event(new MessageSent($message));
+
+        return $message;
     }
 
     public function queue(): WhatsAppMessage
     {
+        $this->ensureRecipient();
+
         $message = $this->createPendingMessage();
 
         WhatsAppSendMessage::dispatch($message);
@@ -577,6 +600,7 @@ class MessageBuilder
 
         return WhatsAppMessage::create([
             'whatsapp_phone_id' => $this->phone->id,
+            'whatsapp_conversation_id' => $this->resolveConversation()->id,
             'message_id' => $messageId,
             'direction' => WhatsAppMessage::DIRECTION_OUTBOUND,
             'type' => $this->resolveMessageTypeForRecord(),
@@ -596,6 +620,7 @@ class MessageBuilder
     {
         return WhatsAppMessage::create([
             'whatsapp_phone_id' => $this->phone->id,
+            'whatsapp_conversation_id' => $this->resolveConversation()->id,
             'message_id' => 'pending_'.uniqid(),
             'direction' => WhatsAppMessage::DIRECTION_OUTBOUND,
             'type' => $this->resolveMessageTypeForRecord(),
@@ -608,6 +633,24 @@ class MessageBuilder
             'template_name' => $this->templateName,
             'template_parameters' => $this->buildTemplateParametersForRecord(),
         ]);
+    }
+
+    protected function ensureRecipient(): string
+    {
+        if ($this->to === null) {
+            throw new \InvalidArgumentException('A recipient is required: call to() or conversation() before sending.');
+        }
+
+        return $this->to;
+    }
+
+    protected function resolveConversation(): WhatsAppConversation
+    {
+        return $this->conversation = OutboundConversationResolver::resolve(
+            $this->phone,
+            $this->ensureRecipient(),
+            $this->conversation
+        );
     }
 
     /**

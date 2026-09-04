@@ -283,7 +283,7 @@ readonly class IncomingMessageContext
 
         return $manager
             ->phone($this->phone->key)
-            ->to($this->conversation->contact_phone);
+            ->conversation($this->conversation);
     }
 
     /**

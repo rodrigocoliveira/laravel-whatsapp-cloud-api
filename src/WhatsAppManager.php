@@ -8,6 +8,7 @@ use Illuminate\Contracts\Foundation\Application;
 use Multek\LaravelWhatsAppCloud\Client\WhatsAppClient;
 use Multek\LaravelWhatsAppCloud\Client\WhatsAppClientInterface;
 use Multek\LaravelWhatsAppCloud\Exceptions\InvalidPhoneException;
+use Multek\LaravelWhatsAppCloud\Models\WhatsAppConversation;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppMessage;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppPhone;
 use Multek\LaravelWhatsAppCloud\Support\MessageBuilder;
@@ -72,6 +73,16 @@ class WhatsAppManager
         $this->ensurePhoneSelected();
 
         return (new MessageBuilder($this->currentPhone, $this->client))->to($phone);
+    }
+
+    /**
+     * Get a MessageBuilder addressed to an existing conversation's contact.
+     */
+    public function conversation(WhatsAppConversation $conversation): MessageBuilder
+    {
+        $this->ensurePhoneSelected();
+
+        return (new MessageBuilder($this->currentPhone, $this->client))->conversation($conversation);
     }
 
     /**

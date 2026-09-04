@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Multek\LaravelWhatsAppCloud\Support;
 
 use Multek\LaravelWhatsAppCloud\Client\WhatsAppClientInterface;
+use Multek\LaravelWhatsAppCloud\Events\MessageSent;
+use Multek\LaravelWhatsAppCloud\Models\WhatsAppConversation;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppMessage;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppPhone;
 
@@ -28,11 +30,24 @@ class TemplateBuilder
     /** @var array<int, array<string, mixed>> */
     protected array $buttonParameters = [];
 
+    protected ?WhatsAppConversation $conversation = null;
+
     public function __construct(
         protected WhatsAppPhone $phone,
         protected WhatsAppClientInterface $client,
         protected string $to,
     ) {}
+
+    /**
+     * Address the template to an existing conversation's contact and link it to that conversation.
+     */
+    public function conversation(WhatsAppConversation $conversation): self
+    {
+        $this->conversation = $conversation;
+        $this->to = $conversation->contact_phone;
+
+        return $this;
+    }
 
     /**
      * Set the template name.
@@ -210,8 +225,11 @@ class TemplateBuilder
 
         $messageId = $result['messages'][0]['id'] ?? 'unknown_'.uniqid();
 
-        return WhatsAppMessage::create([
+        $conversation = OutboundConversationResolver::resolve($this->phone, $this->to, $this->conversation);
+
+        $message = WhatsAppMessage::create([
             'whatsapp_phone_id' => $this->phone->id,
+            'whatsapp_conversation_id' => $conversation->id,
             'message_id' => $messageId,
             'direction' => WhatsAppMessage::DIRECTION_OUTBOUND,
             'type' => 'template',
@@ -234,5 +252,9 @@ class TemplateBuilder
                 'buttons' => $this->buttonParameters,
             ],
         ]);
+
+        event(new MessageSent($message));
+
+        return $message;
     }
 }
