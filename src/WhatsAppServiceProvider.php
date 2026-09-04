@@ -19,6 +19,7 @@ use Multek\LaravelWhatsAppCloud\Models\WhatsAppPhone;
 use Multek\LaravelWhatsAppCloud\Observers\WhatsAppPhoneObserver;
 use Multek\LaravelWhatsAppCloud\Services\MediaService;
 use Multek\LaravelWhatsAppCloud\Services\TranscriptionService;
+use Multek\LaravelWhatsAppCloud\Support\PricingCalculator;
 
 class WhatsAppServiceProvider extends ServiceProvider
 {
@@ -33,6 +34,10 @@ class WhatsAppServiceProvider extends ServiceProvider
         $this->app->bind(WhatsAppClientInterface::class, WhatsAppClient::class);
         $this->app->bind(MediaStorageInterface::class, MediaService::class);
         $this->app->bind(TranscriptionServiceInterface::class, TranscriptionService::class);
+
+        $this->app->bind(PricingCalculator::class, function ($app) {
+            return new PricingCalculator($app['config']->get('whatsapp.pricing', []));
+        });
 
         $this->app->alias(WhatsAppManager::class, 'whatsapp');
     }

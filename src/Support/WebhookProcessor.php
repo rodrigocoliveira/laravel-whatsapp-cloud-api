@@ -262,7 +262,7 @@ class WebhookProcessor
                 break;
         }
 
-        $message->update($updates);
+        $message->update(array_merge($updates, $this->extractPricing($statusData)));
 
         // Fire appropriate event only if status actually changed
         if ($shouldFireEvent) {
@@ -282,6 +282,44 @@ class WebhookProcessor
                 'status' => $status,
             ]);
         }
+    }
+
+    /**
+     * Extract billing classification and conversation info from a status object.
+     *
+     * Meta includes `pricing` and `conversation` on outbound status webhooks
+     * (sent/delivered/read). The monetary amount is never included; only the
+     * billing category, which the app maps to a rate card.
+     *
+     * @param  array<string, mixed>  $statusData
+     * @return array<string, mixed>
+     */
+    protected function extractPricing(array $statusData): array
+    {
+        $updates = [];
+
+        $pricing = $statusData['pricing'] ?? null;
+        if (is_array($pricing)) {
+            if (array_key_exists('billable', $pricing)) {
+                $updates['pricing_billable'] = (bool) $pricing['billable'];
+            }
+            $updates['pricing_model'] = $pricing['pricing_model'] ?? null;
+            $updates['pricing_category'] = $pricing['category'] ?? null;
+            $updates['pricing_type'] = $pricing['type'] ?? null;
+        }
+
+        $conversation = $statusData['conversation'] ?? null;
+        if (is_array($conversation)) {
+            $updates['meta_conversation_id'] = $conversation['id'] ?? null;
+            $updates['conversation_origin'] = $conversation['origin']['type'] ?? null;
+
+            $expiration = $conversation['expiration_timestamp'] ?? null;
+            if ($expiration !== null && $expiration !== '') {
+                $updates['conversation_expires_at'] = Carbon::createFromTimestamp((int) $expiration);
+            }
+        }
+
+        return $updates;
     }
 
     /**

@@ -105,6 +105,40 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Message Pricing
+    |--------------------------------------------------------------------------
+    | Meta reports the billing category of each outbound message on status
+    | webhooks (stored in `pricing_category`) but never the amount charged.
+    | This rate card maps category to a per-message rate so the package can
+    | estimate cost via `$message->estimatedCost()`.
+    |
+    | Keys under `rates` are E.164 dial-code prefixes (without "+"); the
+    | longest prefix matching the recipient wins, and `default` is used when
+    | nothing matches. Categories follow Meta's naming: marketing, utility,
+    | authentication, authentication-international, service.
+    |
+    | Rates below are USD per message under Meta's per-message pricing (PMP).
+    | Always verify against the current rate card before relying on them:
+    | https://developers.facebook.com/docs/whatsapp/pricing
+    */
+    'pricing' => [
+        'currency' => env('WHATSAPP_PRICING_CURRENCY', 'USD'),
+        'rates' => [
+            // Brazil
+            '55' => [
+                'marketing' => 0.0625,
+                'utility' => 0.0080,
+                'authentication' => 0.0315,
+                'service' => 0.0,
+            ],
+            'default' => [
+                'service' => 0.0,
+            ],
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Queue Configuration
     |--------------------------------------------------------------------------
     */

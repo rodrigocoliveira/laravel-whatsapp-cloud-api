@@ -402,6 +402,57 @@ Event::listen(MediaDownloaded::class, function (MediaDownloaded $event) {
 | `MediaDownloaded` | After media saved locally |
 | `AudioTranscribed` | After audio transcribed |
 
+### Message Pricing
+
+Meta reports the **billing classification** of every outbound message on its status
+webhooks, but never the amount charged. The package stores that classification on
+`whatsapp_messages` and estimates the cost from a configurable rate card.
+
+Columns populated from the `sent`/`delivered`/`read` status webhook:
+
+| Column | Source | Example |
+|--------|--------|---------|
+| `pricing_billable` | `pricing.billable` | `true` |
+| `pricing_model` | `pricing.pricing_model` | `PMP` (per-message) or `CBP` (legacy per-conversation) |
+| `pricing_category` | `pricing.category` | `marketing`, `utility`, `authentication`, `service` |
+| `pricing_type` | `pricing.type` | `regular`, `free_customer_service`, `free_entry_point` |
+| `meta_conversation_id` | `conversation.id` | Meta's conversation identifier |
+| `conversation_origin` | `conversation.origin.type` | `marketing`, `user_initiated`, ... |
+| `conversation_expires_at` | `conversation.expiration_timestamp` | End of the pricing window |
+
+Configure the rate card in `config/whatsapp.php` under `pricing.rates`, keyed by
+E.164 dial-code prefix (longest match wins, `default` as fallback):
+
+```php
+'pricing' => [
+    'currency' => 'USD',
+    'rates' => [
+        '55' => ['marketing' => 0.0625, 'utility' => 0.0080, 'authentication' => 0.0315, 'service' => 0.0],
+        'default' => ['service' => 0.0],
+    ],
+],
+```
+
+Then read the estimate on any message:
+
+```php
+$message->isBillable();     // true, false, or null if no status webhook with pricing yet
+$message->estimatedCost();  // 0.0625, 0.0 for non-billable, or null when no rate is configured
+
+// Monthly spend per category for one phone
+WhatsAppMessage::where('whatsapp_phone_id', $phone->id)
+    ->where('pricing_billable', true)
+    ->whereBetween('sent_at', [$start, $end])
+    ->get()
+    ->groupBy('pricing_category')
+    ->map(fn ($messages) => $messages->sum->estimatedCost());
+```
+
+Always verify the shipped rates against Meta's current rate card
+(<https://developers.facebook.com/docs/whatsapp/pricing>). For exact billed amounts
+use the WABA `pricing_analytics` Graph API endpoint, which reports cost aggregated by
+day, country and category.
+
 ## Processing Modes
 
 ### Batch Mode (Default)

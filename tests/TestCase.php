@@ -155,9 +155,10 @@ abstract class TestCase extends BaseTestCase
     /**
      * Get a sample status update webhook payload.
      *
+     * @param  array<string, mixed>  $overrides  Extra keys merged into the status object (e.g. pricing)
      * @return array<string, mixed>
      */
-    protected function getStatusWebhookPayload(string $messageId, string $status): array
+    protected function getStatusWebhookPayload(string $messageId, string $status, array $overrides = []): array
     {
         $statusData = [
             'id' => $messageId,
@@ -186,6 +187,8 @@ abstract class TestCase extends BaseTestCase
                 ],
             ];
         }
+
+        $statusData = array_merge($statusData, $overrides);
 
         return [
             'object' => 'whatsapp_business_account',
