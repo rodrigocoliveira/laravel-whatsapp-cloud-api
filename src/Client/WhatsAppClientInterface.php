@@ -119,14 +119,14 @@ interface WhatsAppClientInterface
      *
      * @return array{messages: array<int, array{id: string}>}
      */
-    public function sendReaction(string $messageId, string $emoji): array;
+    public function sendReaction(string $to, string $messageId, string $emoji): array;
 
     /**
      * Remove reaction from a message.
      *
      * @return array{messages: array<int, array{id: string}>}
      */
-    public function removeReaction(string $messageId): array;
+    public function removeReaction(string $to, string $messageId): array;
 
     /**
      * Mark a message as read.

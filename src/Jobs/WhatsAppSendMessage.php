@@ -101,7 +101,7 @@ class WhatsAppSendMessage implements ShouldQueue
                 $content['address'] ?? null
             ),
             'contacts' => $client->sendContacts($to, $content['contacts'] ?? []),
-            'reaction' => $client->sendReaction($content['message_id'] ?? '', $content['emoji'] ?? ''),
+            'reaction' => $client->sendReaction($to, $content['message_id'] ?? '', $content['emoji'] ?? ''),
             'template' => $client->sendTemplate(
                 $to,
                 $message->template_name ?? '',

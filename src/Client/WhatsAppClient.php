@@ -381,12 +381,12 @@ class WhatsAppClient implements WhatsAppClientInterface
     /**
      * Send reaction to a message.
      */
-    public function sendReaction(string $messageId, string $emoji): array
+    public function sendReaction(string $to, string $messageId, string $emoji): array
     {
         return $this->sendMessage([
             'messaging_product' => 'whatsapp',
             'recipient_type' => 'individual',
-            'to' => $this->phone->phone_number,
+            'to' => $this->normalizePhoneNumber($to),
             'type' => 'reaction',
             'reaction' => [
                 'message_id' => $messageId,
@@ -398,9 +398,9 @@ class WhatsAppClient implements WhatsAppClientInterface
     /**
      * Remove reaction from a message.
      */
-    public function removeReaction(string $messageId): array
+    public function removeReaction(string $to, string $messageId): array
     {
-        return $this->sendReaction($messageId, '');
+        return $this->sendReaction($to, $messageId, '');
     }
 
     /**
