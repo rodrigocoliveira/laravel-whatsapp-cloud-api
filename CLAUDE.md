@@ -78,6 +78,7 @@ tests/                        # Pest test suite
 | `MediaService` | Downloads and stores media files |
 | `TranscriptionService` | Audio-to-text via OpenAI Whisper |
 | `MessageBuilder` | Fluent API for constructing outbound messages |
+| `PricingCalculator` | Maps Meta billing category + recipient country to a per-message rate |
 | `IncomingMessageContext` | DTO passed to handlers with batch context |
 
 ### Database Models
@@ -183,6 +184,8 @@ Key configuration options in `config/whatsapp.php`:
 | `flows.handler` | env | `FlowHandlerInterface` implementation for dynamic Flows |
 | `media.storage_disk` | `local` | Laravel disk for media storage |
 | `media.storage_path` | `whatsapp/media` | Path on disk |
+| `pricing.currency` | `USD` | Currency of the rate card |
+| `pricing.rates` | Brazil rates | Per-message rates keyed by dial-code prefix and Meta billing category |
 
 ## Testing Guidelines
 

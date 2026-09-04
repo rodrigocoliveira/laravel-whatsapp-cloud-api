@@ -25,6 +25,7 @@ use Multek\LaravelWhatsAppCloud\DTOs\MessageContent\UnknownContent;
 use Multek\LaravelWhatsAppCloud\DTOs\MessageContent\VideoContent;
 use Multek\LaravelWhatsAppCloud\Events\MessageReady;
 use Multek\LaravelWhatsAppCloud\Support\PhoneNumberHelper;
+use Multek\LaravelWhatsAppCloud\Support\PricingCalculator;
 
 /**
  * @property int $id
@@ -55,6 +56,13 @@ use Multek\LaravelWhatsAppCloud\Support\PhoneNumberHelper;
  * @property Carbon|null $sent_at
  * @property Carbon|null $delivered_at
  * @property Carbon|null $read_at
+ * @property bool|null $pricing_billable
+ * @property string|null $pricing_model
+ * @property string|null $pricing_category
+ * @property string|null $pricing_type
+ * @property string|null $meta_conversation_id
+ * @property string|null $conversation_origin
+ * @property Carbon|null $conversation_expires_at
  * @property string|null $template_name
  * @property array|null $template_parameters
  * @property array|null $metadata
@@ -181,6 +189,13 @@ class WhatsAppMessage extends Model
         'sent_at',
         'delivered_at',
         'read_at',
+        'pricing_billable',
+        'pricing_model',
+        'pricing_category',
+        'pricing_type',
+        'meta_conversation_id',
+        'conversation_origin',
+        'conversation_expires_at',
         'template_name',
         'template_parameters',
         'metadata',
@@ -195,6 +210,8 @@ class WhatsAppMessage extends Model
         'sent_at' => 'datetime',
         'delivered_at' => 'datetime',
         'read_at' => 'datetime',
+        'pricing_billable' => 'boolean',
+        'conversation_expires_at' => 'datetime',
     ];
 
     /**
@@ -291,6 +308,37 @@ class WhatsAppMessage extends Model
             ),
             default => new UnknownContent(type: $this->type, data: $content),
         };
+    }
+
+    // Pricing
+
+    /**
+     * Whether Meta flagged this message as billable.
+     * Null until a status webhook carrying pricing info has been received.
+     */
+    public function isBillable(): ?bool
+    {
+        return $this->pricing_billable;
+    }
+
+    /**
+     * Estimated cost from the configured rate card (config `whatsapp.pricing`).
+     *
+     * Returns null when pricing info has not arrived yet or no rate is
+     * configured for the recipient's country and category; 0.0 when Meta
+     * marked the message as not billable.
+     */
+    public function estimatedCost(): ?float
+    {
+        if ($this->pricing_billable === null) {
+            return null;
+        }
+
+        if ($this->pricing_billable === false) {
+            return 0.0;
+        }
+
+        return app(PricingCalculator::class)->rateFor($this->to, $this->pricing_category);
     }
 
     // Type checks
