@@ -540,6 +540,7 @@ class MessageBuilder
                 $this->contacts
             ),
             'reaction' => $this->client->sendReaction(
+                $this->to,
                 $this->reactionMessageId ?? '',
                 $this->reactionEmoji ?? ''
             ),

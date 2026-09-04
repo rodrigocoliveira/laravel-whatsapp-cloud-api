@@ -183,6 +183,14 @@ WhatsApp::phone('support')
     ->conversation($conversation)
     ->text('Following up on your order')
     ->send();
+
+// React to a message: the recipient is resolved from the stored message
+// (sender of an inbound message, destination of an outbound one)
+WhatsApp::phone('support')->sendReaction('wamid.HBgL...', '👍');
+WhatsApp::phone('support')->removeReaction('wamid.HBgL...');
+
+// Reacting to a message that is not stored locally requires the recipient
+WhatsApp::phone('support')->sendReaction('wamid.HBgL...', '👍', to: '+5511999999999');
 ```
 
 Every outbound message is linked to a `WhatsAppConversation`, resolved from the sending phone and

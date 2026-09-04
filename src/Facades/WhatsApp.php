@@ -20,8 +20,8 @@ use Multek\LaravelWhatsAppCloud\WhatsAppManager;
  * @method static WhatsAppMessage sendSticker(string $to, string $urlOrMediaId)
  * @method static WhatsAppMessage sendLocation(string $to, float $latitude, float $longitude, ?string $name = null, ?string $address = null)
  * @method static WhatsAppMessage sendContacts(string $to, array $contacts)
- * @method static WhatsAppMessage sendReaction(string $messageId, string $emoji)
- * @method static WhatsAppMessage removeReaction(string $messageId)
+ * @method static WhatsAppMessage sendReaction(string $messageId, string $emoji, ?string $to = null)
+ * @method static WhatsAppMessage removeReaction(string $messageId, ?string $to = null)
  * @method static array markAsRead(string $messageId)
  *
  * @see WhatsAppManager

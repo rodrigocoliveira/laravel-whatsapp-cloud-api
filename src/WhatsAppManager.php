@@ -171,22 +171,48 @@ class WhatsAppManager
 
     /**
      * Send a reaction to a message.
+     *
+     * The recipient is resolved from the stored message: the sender of an
+     * inbound message or the destination of an outbound one. Pass $to when
+     * reacting to a message that is not stored locally.
+     *
+     * @throws \InvalidArgumentException when the message is unknown and no recipient is given
      */
-    public function sendReaction(string $messageId, string $emoji): WhatsAppMessage
+    public function sendReaction(string $messageId, string $emoji, ?string $to = null): WhatsAppMessage
     {
         $this->ensurePhoneSelected();
 
-        return (new MessageBuilder($this->currentPhone, $this->client))
-            ->reaction($messageId, $emoji)
-            ->send();
+        $builder = new MessageBuilder($this->currentPhone, $this->client);
+
+        $original = WhatsAppMessage::where('whatsapp_phone_id', $this->currentPhone->id)
+            ->where('message_id', $messageId)
+            ->first();
+
+        if ($original !== null) {
+            $recipient = $original->isInbound() ? $original->from : $original->to;
+
+            $original->conversation !== null
+                ? $builder->conversation($original->conversation)
+                : $builder->to($recipient);
+        } elseif ($to !== null) {
+            $builder->to($to);
+        } else {
+            throw new \InvalidArgumentException(
+                "Cannot react to message [{$messageId}]: it is not stored locally, so a recipient must be given."
+            );
+        }
+
+        return $builder->reaction($messageId, $emoji)->send();
     }
 
     /**
      * Remove a reaction from a message.
+     *
+     * @throws \InvalidArgumentException when the message is unknown and no recipient is given
      */
-    public function removeReaction(string $messageId): WhatsAppMessage
+    public function removeReaction(string $messageId, ?string $to = null): WhatsAppMessage
     {
-        return $this->sendReaction($messageId, '');
+        return $this->sendReaction($messageId, '', $to);
     }
 
     /**
