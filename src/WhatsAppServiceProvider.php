@@ -23,6 +23,18 @@ use Multek\LaravelWhatsAppCloud\Support\PricingCalculator;
 
 class WhatsAppServiceProvider extends ServiceProvider
 {
+    /**
+     * Whether the package's migrations should be auto-loaded from vendor/.
+     * Disable via {@see self::ignoreMigrations()} if you already publish
+     * and customize your own copies.
+     */
+    public static bool $runsMigrations = true;
+
+    public static function ignoreMigrations(): void
+    {
+        static::$runsMigrations = false;
+    }
+
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../config/whatsapp.php', 'whatsapp');
@@ -66,6 +78,10 @@ class WhatsAppServiceProvider extends ServiceProvider
 
     protected function publishMigrations(): void
     {
+        if (static::$runsMigrations) {
+            $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+        }
+
         $this->publishesMigrations([
             __DIR__.'/../database/migrations' => database_path('migrations'),
         ], 'whatsapp-migrations');

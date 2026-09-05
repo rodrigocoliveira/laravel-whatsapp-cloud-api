@@ -100,6 +100,9 @@ class MessageBuilder
 
     protected ?string $reactionEmoji = null;
 
+    /** @var array<string, mixed> */
+    protected array $metadata = [];
+
     public function __construct(
         protected WhatsAppPhone $phone,
         protected WhatsAppClientInterface $client,
@@ -120,6 +123,19 @@ class MessageBuilder
     {
         $this->conversation = $conversation;
         $this->to = $conversation->contact_phone;
+
+        return $this;
+    }
+
+    /**
+     * Stamp the outbound message record with extra metadata, merged before it is
+     * persisted and before any events fire.
+     *
+     * @param  array<string, mixed>  $metadata
+     */
+    public function metadata(array $metadata): self
+    {
+        $this->metadata = array_merge($this->metadata, $metadata);
 
         return $this;
     }
@@ -614,6 +630,7 @@ class MessageBuilder
             'sent_at' => now(),
             'template_name' => $this->templateName,
             'template_parameters' => $this->buildTemplateParametersForRecord(),
+            'metadata' => $this->metadata ?: null,
         ]);
     }
 
@@ -633,6 +650,7 @@ class MessageBuilder
             'delivery_status' => WhatsAppMessage::DELIVERY_STATUS_QUEUED,
             'template_name' => $this->templateName,
             'template_parameters' => $this->buildTemplateParametersForRecord(),
+            'metadata' => $this->metadata ?: null,
         ]);
     }
 
