@@ -68,6 +68,7 @@ class WebhookController extends Controller
         } catch (\Throwable $e) {
             $webhookLog?->markAsFailed($e->getMessage());
             Log::error('Webhook processing failed', ['error' => $e->getMessage()]);
+            report($e);
         }
 
         // Always respond with 200 OK quickly

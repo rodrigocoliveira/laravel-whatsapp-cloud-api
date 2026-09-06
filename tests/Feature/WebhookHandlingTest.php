@@ -2,12 +2,14 @@
 
 declare(strict_types=1);
 
+use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Support\Facades\Event;
 use Multek\LaravelWhatsAppCloud\Events\MessageDelivered;
 use Multek\LaravelWhatsAppCloud\Events\MessageRead;
 use Multek\LaravelWhatsAppCloud\Events\MessageSent;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppMessage;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppPhone;
+use Multek\LaravelWhatsAppCloud\Support\WebhookProcessor;
 
 it('verifies webhook subscription', function () {
     $response = $this->get('/webhooks/whatsapp?'.http_build_query([
@@ -27,7 +29,7 @@ it('rejects invalid verify token', function () {
         'hub_challenge' => 'test_challenge',
     ]));
 
-    $response->assertStatus(500);
+    $response->assertStatus(403);
 });
 
 it('rejects invalid hub mode', function () {
@@ -37,7 +39,7 @@ it('rejects invalid hub mode', function () {
         'hub_challenge' => 'test_challenge',
     ]));
 
-    $response->assertStatus(500);
+    $response->assertStatus(403);
 });
 
 it('processes incoming text message', function () {
@@ -80,7 +82,7 @@ it('rejects webhook with invalid signature', function () {
         'X-Hub-Signature-256' => 'sha256=invalid_signature',
     ]);
 
-    $response->assertStatus(500);
+    $response->assertStatus(403);
 });
 
 it('ignores duplicate messages', function () {
@@ -237,4 +239,50 @@ it('fires events for each unique status change', function () {
     expect($message->sent_at)->not->toBeNull();
     expect($message->delivered_at)->not->toBeNull();
     expect($message->read_at)->not->toBeNull();
+});
+
+it('reports webhook processing failures to the application exception handler', function () {
+    $failingProcessor = new class extends WebhookProcessor
+    {
+        public function process(array $payload): void
+        {
+            throw new RuntimeException('boom');
+        }
+    };
+    app()->instance(WebhookProcessor::class, $failingProcessor);
+
+    $handler = new class implements ExceptionHandler
+    {
+        public array $reported = [];
+
+        public function report(Throwable $e)
+        {
+            $this->reported[] = $e;
+        }
+
+        public function shouldReport(Throwable $e)
+        {
+            return true;
+        }
+
+        public function render($request, Throwable $e)
+        {
+            throw $e;
+        }
+
+        public function renderForConsole($output, Throwable $e) {}
+    };
+    app()->instance(ExceptionHandler::class, $handler);
+
+    $payload = $this->getTextMessagePayload();
+    $signature = $this->generateSignature($payload);
+
+    $response = $this->postJson('/webhooks/whatsapp', $payload, [
+        'X-Hub-Signature-256' => $signature,
+    ]);
+
+    $response->assertOk();
+    $response->assertSee('EVENT_RECEIVED');
+    expect($handler->reported)->toHaveCount(1);
+    expect($handler->reported[0]->getMessage())->toBe('boom');
 });

@@ -6,6 +6,7 @@ namespace Multek\LaravelWhatsAppCloud\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Multek\LaravelWhatsAppCloud\Exceptions\WebhookVerificationException;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -29,6 +30,8 @@ class VerifyWhatsAppSignature
 
         // If no app secret is configured, skip verification
         if (empty($appSecret)) {
+            Log::warning('WhatsApp webhook signature verification is disabled: whatsapp.webhook.app_secret is empty.');
+
             return $next($request);
         }
 

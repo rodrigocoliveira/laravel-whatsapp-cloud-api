@@ -38,6 +38,8 @@ Run the migrations:
 php artisan migrate
 ```
 
+> Since v1.4.0 the package's migrations run automatically on `php artisan migrate` (loaded straight from vendor/), so future releases that add or change a migration no longer require re-publishing. If you previously ran `vendor:publish --tag=whatsapp-migrations` and customized your copy, call `WhatsAppServiceProvider::ignoreMigrations()` from your own service provider's `register()` method to keep using only your published copy.
+
 ## Configuration
 
 ### Environment Variables

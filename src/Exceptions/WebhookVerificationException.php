@@ -4,8 +4,16 @@ declare(strict_types=1);
 
 namespace Multek\LaravelWhatsAppCloud\Exceptions;
 
+use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
+
 class WebhookVerificationException extends WhatsAppException
 {
+    public function render(Request $request): Response
+    {
+        return response($this->getMessage(), 403);
+    }
+
     public static function invalidVerifyToken(): self
     {
         return new self('Invalid webhook verify token.');
