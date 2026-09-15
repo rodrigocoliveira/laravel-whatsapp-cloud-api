@@ -17,6 +17,7 @@ use Multek\LaravelWhatsAppCloud\Support\PhoneNumberHelper;
  * @property string $contact_phone
  * @property string|null $contact_name
  * @property Carbon $last_message_at
+ * @property Carbon|null $last_inbound_message_at
  * @property string $status
  * @property int $unread_count
  * @property array|null $metadata
@@ -41,6 +42,7 @@ class WhatsAppConversation extends Model
         'contact_phone',
         'contact_name',
         'last_message_at',
+        'last_inbound_message_at',
         'status',
         'unread_count',
         'metadata',
@@ -48,9 +50,16 @@ class WhatsAppConversation extends Model
 
     protected $casts = [
         'last_message_at' => 'datetime',
+        'last_inbound_message_at' => 'datetime',
         'unread_count' => 'integer',
         'metadata' => 'array',
     ];
+
+    /**
+     * The WhatsApp customer service window: 24 hours from the contact's last
+     * inbound message. Outbound replies never extend it.
+     */
+    public const SERVICE_WINDOW_HOURS = 24;
 
     /**
      * @return BelongsTo<WhatsAppPhone, $this>
@@ -114,6 +123,32 @@ class WhatsAppConversation extends Model
     public function reopen(): void
     {
         $this->update(['status' => self::STATUS_ACTIVE]);
+    }
+
+    /**
+     * Whether the WhatsApp 24-hour customer service window is still open,
+     * i.e. free-form messages can be sent without a template.
+     */
+    public function isWithin24HourWindow(): bool
+    {
+        if ($this->last_inbound_message_at === null) {
+            return false;
+        }
+
+        return $this->last_inbound_message_at->addHours(self::SERVICE_WINDOW_HOURS)->isFuture();
+    }
+
+    /**
+     * When the 24-hour customer service window closes, or null if the
+     * contact has never messaged in.
+     */
+    public function serviceWindowExpiresAt(): ?Carbon
+    {
+        if ($this->last_inbound_message_at === null) {
+            return null;
+        }
+
+        return $this->last_inbound_message_at->clone()->addHours(self::SERVICE_WINDOW_HOURS);
     }
 
     /**

@@ -173,6 +173,7 @@ class WebhookProcessor
         // Update conversation
         $conversation->update([
             'last_message_at' => $message->created_at,
+            'last_inbound_message_at' => $message->created_at,
             'contact_name' => $contactData['profile']['name'] ?? $conversation->contact_name,
         ]);
         $conversation->incrementUnread();
@@ -337,6 +338,7 @@ class WebhookProcessor
             [
                 'contact_name' => $contactData['profile']['name'] ?? null,
                 'last_message_at' => now(),
+                'last_inbound_message_at' => now(),
                 'status' => WhatsAppConversation::STATUS_ACTIVE,
             ]
         );
