@@ -260,31 +260,31 @@ class WhatsAppMessage extends Model
         return match ($this->type) {
             self::TYPE_TEXT => new TextContent($content['body'] ?? $this->text_body ?? ''),
             self::TYPE_IMAGE => new ImageContent(
-                mediaId: $content['id'] ?? $this->media_id ?? '',
+                mediaId: $content['id'] ?? $this->media_id ?? $content['url'] ?? '',
                 caption: $content['caption'] ?? null,
                 mimeType: $content['mime_type'] ?? $this->media_mime_type,
                 sha256: $content['sha256'] ?? null,
             ),
             self::TYPE_VIDEO => new VideoContent(
-                mediaId: $content['id'] ?? $this->media_id ?? '',
+                mediaId: $content['id'] ?? $this->media_id ?? $content['url'] ?? '',
                 caption: $content['caption'] ?? null,
                 mimeType: $content['mime_type'] ?? $this->media_mime_type,
                 sha256: $content['sha256'] ?? null,
             ),
             self::TYPE_AUDIO => new AudioContent(
-                mediaId: $content['id'] ?? $this->media_id ?? '',
+                mediaId: $content['id'] ?? $this->media_id ?? $content['url'] ?? '',
                 mimeType: $content['mime_type'] ?? $this->media_mime_type,
                 voice: $content['voice'] ?? false,
             ),
             self::TYPE_DOCUMENT => new DocumentContent(
-                mediaId: $content['id'] ?? $this->media_id ?? '',
+                mediaId: $content['id'] ?? $this->media_id ?? $content['url'] ?? '',
                 filename: $content['filename'] ?? null,
                 caption: $content['caption'] ?? null,
                 mimeType: $content['mime_type'] ?? $this->media_mime_type,
                 sha256: $content['sha256'] ?? null,
             ),
             self::TYPE_STICKER => new StickerContent(
-                mediaId: $content['id'] ?? $this->media_id ?? '',
+                mediaId: $content['id'] ?? $this->media_id ?? $content['url'] ?? '',
                 mimeType: $content['mime_type'] ?? $this->media_mime_type,
                 animated: $content['animated'] ?? false,
             ),
@@ -479,7 +479,7 @@ class WhatsAppMessage extends Model
     // Media helpers
     public function hasMedia(): bool
     {
-        return $this->isMedia() && $this->media_id !== null;
+        return $this->isMedia() && ($this->media_id !== null || $this->getContentUrl() !== null);
     }
 
     public function getMediaPath(): ?string
@@ -487,13 +487,27 @@ class WhatsAppMessage extends Model
         return $this->local_media_path;
     }
 
+    /**
+     * The media URL, whether it was downloaded locally (inbound) or sent
+     * directly by URL (outbound, before any local media_id is assigned).
+     */
     public function getMediaUrl(): ?string
     {
-        if ($this->local_media_path === null || $this->local_media_disk === null) {
-            return null;
+        if ($this->local_media_path !== null && $this->local_media_disk !== null) {
+            return Storage::disk($this->local_media_disk)->url($this->local_media_path);
         }
 
-        return Storage::disk($this->local_media_disk)->url($this->local_media_path);
+        return $this->getContentUrl();
+    }
+
+    /**
+     * The raw `content['url']` for outbound media sent by URL, if present.
+     */
+    protected function getContentUrl(): ?string
+    {
+        $url = ($this->content ?? [])['url'] ?? null;
+
+        return is_string($url) && $url !== '' ? $url : null;
     }
 
     public function getMediaFullPath(): ?string
