@@ -548,7 +548,7 @@ class WhatsAppMessage extends Model
 
         $this->update(['transcription_status' => self::TRANSCRIPTION_STATUS_PENDING]);
 
-        WhatsAppTranscribeAudio::dispatch($this);
+        WhatsAppTranscribeAudio::dispatch($this)->afterCommit();
 
         return true;
     }
