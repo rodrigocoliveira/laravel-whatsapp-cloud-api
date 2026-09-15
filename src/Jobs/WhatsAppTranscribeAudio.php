@@ -42,7 +42,7 @@ class WhatsAppTranscribeAudio implements ShouldQueue
 
         // Skip if no local file
         if (! $message->local_media_path || ! $message->local_media_disk) {
-            $message->markAsReady();
+            $this->advanceInboundPipeline($message);
 
             return;
         }
@@ -63,8 +63,7 @@ class WhatsAppTranscribeAudio implements ShouldQueue
                 'transcription_duration' => $result->duration,
             ]);
 
-            $message->markAsReady();
-            $this->checkBatchProcessing($message);
+            $this->advanceInboundPipeline($message);
 
             event(new AudioTranscribed($message));
 
@@ -127,8 +126,21 @@ class WhatsAppTranscribeAudio implements ShouldQueue
         ]);
 
         // Mark as ready anyway so batch processing can continue
-        $this->message->markAsReady();
-        $this->checkBatchProcessing($this->message);
+        $this->advanceInboundPipeline($this->message);
+    }
+
+    /**
+     * Only contact messages travel the ready → batch → processed pipeline;
+     * outbound rows are already `processed` when they are created.
+     */
+    protected function advanceInboundPipeline(WhatsAppMessage $message): void
+    {
+        if (! $message->isInbound()) {
+            return;
+        }
+
+        $message->markAsReady();
+        $this->checkBatchProcessing($message);
     }
 
     /**

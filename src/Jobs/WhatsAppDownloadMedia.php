@@ -51,14 +51,16 @@ class WhatsAppDownloadMedia implements ShouldQueue
 
             event(new MediaDownloaded($message));
 
-            // If audio and transcription enabled, transcribe
+            // Setting local_media_path above already queued WhatsAppTranscribeAudio
+            // (via WhatsAppMessage::requestTranscription()) when eligible. In that
+            // case the ready/batch pipeline waits for that job to finish instead of
+            // advancing here.
             if ($message->isAudio() && $message->phone->transcription_enabled) {
-                $message->update(['transcription_status' => WhatsAppMessage::TRANSCRIPTION_STATUS_PENDING]);
-                WhatsAppTranscribeAudio::dispatch($message);
-            } else {
-                $message->markAsReady();
-                $this->checkBatchProcessing($message);
+                return;
             }
+
+            $message->markAsReady();
+            $this->checkBatchProcessing($message);
 
         } catch (Exception $e) {
             // Update error message but don't mark as ready yet - let retries happen

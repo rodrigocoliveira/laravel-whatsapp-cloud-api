@@ -24,6 +24,7 @@ use Multek\LaravelWhatsAppCloud\DTOs\MessageContent\TextContent;
 use Multek\LaravelWhatsAppCloud\DTOs\MessageContent\UnknownContent;
 use Multek\LaravelWhatsAppCloud\DTOs\MessageContent\VideoContent;
 use Multek\LaravelWhatsAppCloud\Events\MessageReady;
+use Multek\LaravelWhatsAppCloud\Jobs\WhatsAppTranscribeAudio;
 use Multek\LaravelWhatsAppCloud\Support\PhoneNumberHelper;
 use Multek\LaravelWhatsAppCloud\Support\PricingCalculator;
 
@@ -75,6 +76,17 @@ use Multek\LaravelWhatsAppCloud\Support\PricingCalculator;
 class WhatsAppMessage extends Model
 {
     protected $table = 'whatsapp_messages';
+
+    protected static function booted(): void
+    {
+        static::updated(function (self $message): void {
+            if (! $message->wasChanged('local_media_path') || ! $message->local_media_path) {
+                return;
+            }
+
+            $message->requestTranscription();
+        });
+    }
 
     // Direction constants
     public const DIRECTION_INBOUND = 'inbound';
@@ -512,6 +524,33 @@ class WhatsAppMessage extends Model
     public function getTranscriptionDuration(): ?float
     {
         return $this->transcription_duration;
+    }
+
+    /**
+     * Queue transcription for this audio message when the phone has it enabled.
+     *
+     * Works for both directions: the job only advances the inbound ready/batch
+     * pipeline for contact messages, so outbound rows just get transcribed.
+     */
+    public function requestTranscription(): bool
+    {
+        if (! $this->isAudio() || ! $this->local_media_path || ! $this->phone->transcription_enabled) {
+            return false;
+        }
+
+        if (in_array($this->transcription_status, [
+            self::TRANSCRIPTION_STATUS_PENDING,
+            self::TRANSCRIPTION_STATUS_TRANSCRIBING,
+            self::TRANSCRIPTION_STATUS_TRANSCRIBED,
+        ], true)) {
+            return false;
+        }
+
+        $this->update(['transcription_status' => self::TRANSCRIPTION_STATUS_PENDING]);
+
+        WhatsAppTranscribeAudio::dispatch($this);
+
+        return true;
     }
 
     // Status helpers
