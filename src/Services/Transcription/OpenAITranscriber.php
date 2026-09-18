@@ -83,8 +83,9 @@ class OpenAITranscriber implements TranscriptionServiceInterface
         }
 
         if (! class_exists(OpenAI::class)) {
-            throw TranscriptionException::serviceNotConfigured(
-                'openai - The openai-php/client package is required. Run: composer require openai-php/client'
+            throw TranscriptionException::missingDependency(
+                'openai-php/client',
+                'composer require openai-php/client'
             );
         }
 

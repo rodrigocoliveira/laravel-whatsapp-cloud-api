@@ -11,6 +11,13 @@ class TranscriptionException extends WhatsAppException
         return new self("Transcription service '{$service}' is not configured properly.");
     }
 
+    public static function missingDependency(string $package, string $installCommand): self
+    {
+        return new self(
+            "Transcription dependency '{$package}' is not installed. Run: {$installCommand}"
+        );
+    }
+
     public static function unsupportedMimeType(string $mimeType): self
     {
         return new self("MIME type '{$mimeType}' is not supported for transcription.");
