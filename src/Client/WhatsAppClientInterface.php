@@ -60,24 +60,27 @@ interface WhatsAppClientInterface
      * Send interactive buttons.
      *
      * @param  array<int, array{id: string, title: string}>  $buttons
+     * @param  string|array<string, mixed>|null  $header
      * @return array{messages: array<int, array{id: string}>}
      */
-    public function sendButtons(string $to, string $body, array $buttons, ?string $header = null, ?string $footer = null): array;
+    public function sendButtons(string $to, string $body, array $buttons, string|array|null $header = null, ?string $footer = null): array;
 
     /**
      * Send interactive list.
      *
      * @param  array<int, array{title: string, rows: array<int, array{id: string, title: string, description?: string}>}>  $sections
+     * @param  string|array<string, mixed>|null  $header
      * @return array{messages: array<int, array{id: string}>}
      */
-    public function sendList(string $to, string $body, string $buttonText, array $sections, ?string $header = null, ?string $footer = null): array;
+    public function sendList(string $to, string $body, string $buttonText, array $sections, string|array|null $header = null, ?string $footer = null): array;
 
     /**
      * Send CTA URL button.
      *
+     * @param  string|array<string, mixed>|null  $header
      * @return array{messages: array<int, array{id: string}>}
      */
-    public function sendCtaUrl(string $to, string $body, string $buttonText, string $url, ?string $header = null, ?string $footer = null): array;
+    public function sendCtaUrl(string $to, string $body, string $buttonText, string $url, string|array|null $header = null, ?string $footer = null): array;
 
     /**
      * Send a WhatsApp Flow CTA message.

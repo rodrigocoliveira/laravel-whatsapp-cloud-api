@@ -158,6 +158,7 @@ WhatsApp::phone('support')
     ->to('+5511999999999')
     ->interactive()
     ->body('Please choose an option:')
+    ->headerImage('https://example.com/welcome.jpg') // URL or uploaded media ID
     ->button('btn_yes', 'Yes')
     ->button('btn_no', 'No')
     ->send();
