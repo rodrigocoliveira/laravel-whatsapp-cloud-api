@@ -173,7 +173,7 @@ class WhatsAppClient implements WhatsAppClientInterface
     /**
      * Send interactive buttons.
      */
-    public function sendButtons(string $to, string $body, array $buttons, ?string $header = null, ?string $footer = null): array
+    public function sendButtons(string $to, string $body, array $buttons, string|array|null $header = null, ?string $footer = null): array
     {
         $interactive = [
             'type' => 'button',
@@ -189,8 +189,8 @@ class WhatsAppClient implements WhatsAppClientInterface
             ],
         ];
 
-        if ($header) {
-            $interactive['header'] = ['type' => 'text', 'text' => $header];
+        if ($headerPayload = $this->buildInteractiveHeader($header)) {
+            $interactive['header'] = $headerPayload;
         }
         if ($footer) {
             $interactive['footer'] = ['text' => $footer];
@@ -208,7 +208,7 @@ class WhatsAppClient implements WhatsAppClientInterface
     /**
      * Send interactive list.
      */
-    public function sendList(string $to, string $body, string $buttonText, array $sections, ?string $header = null, ?string $footer = null): array
+    public function sendList(string $to, string $body, string $buttonText, array $sections, string|array|null $header = null, ?string $footer = null): array
     {
         $interactive = [
             'type' => 'list',
@@ -226,8 +226,8 @@ class WhatsAppClient implements WhatsAppClientInterface
             ],
         ];
 
-        if ($header) {
-            $interactive['header'] = ['type' => 'text', 'text' => $header];
+        if ($headerPayload = $this->buildInteractiveHeader($header)) {
+            $interactive['header'] = $headerPayload;
         }
         if ($footer) {
             $interactive['footer'] = ['text' => $footer];
@@ -245,7 +245,7 @@ class WhatsAppClient implements WhatsAppClientInterface
     /**
      * Send CTA URL button.
      */
-    public function sendCtaUrl(string $to, string $body, string $buttonText, string $url, ?string $header = null, ?string $footer = null): array
+    public function sendCtaUrl(string $to, string $body, string $buttonText, string $url, string|array|null $header = null, ?string $footer = null): array
     {
         $interactive = [
             'type' => 'cta_url',
@@ -259,8 +259,8 @@ class WhatsAppClient implements WhatsAppClientInterface
             ],
         ];
 
-        if ($header) {
-            $interactive['header'] = ['type' => 'text', 'text' => $header];
+        if ($headerPayload = $this->buildInteractiveHeader($header)) {
+            $interactive['header'] = $headerPayload;
         }
         if ($footer) {
             $interactive['footer'] = ['text' => $footer];
@@ -613,6 +613,39 @@ class WhatsAppClient implements WhatsAppClientInterface
     protected function normalizePhoneNumber(string $phone): string
     {
         return PhoneNumberHelper::toDigits($phone);
+    }
+
+    /**
+     * Build a text or image header for an interactive message.
+     *
+     * @param  string|array<string, mixed>|null  $header
+     * @return array<string, mixed>|null
+     */
+    protected function buildInteractiveHeader(string|array|null $header): ?array
+    {
+        if ($header === null || $header === '') {
+            return null;
+        }
+
+        if (is_string($header)) {
+            return ['type' => 'text', 'text' => $header];
+        }
+
+        if (($header['type'] ?? null) !== 'image' || ! isset($header['image'])) {
+            throw new \InvalidArgumentException('Interactive headers must be text or an image header.');
+        }
+
+        $image = $header['image'];
+
+        if (is_string($image)) {
+            $image = $this->isUrl($image) ? ['link' => $image] : ['id' => $image];
+        }
+
+        if (! is_array($image) || (! isset($image['link']) && ! isset($image['id']))) {
+            throw new \InvalidArgumentException('Interactive image headers require an image URL or media ID.');
+        }
+
+        return ['type' => 'image', 'image' => $image];
     }
 
     /**

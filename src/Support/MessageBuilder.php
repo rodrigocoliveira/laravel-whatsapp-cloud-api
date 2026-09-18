@@ -57,7 +57,8 @@ class MessageBuilder
     // Interactive Buttons
     protected ?string $interactiveBody = null;
 
-    protected ?string $interactiveHeader = null;
+    /** @var string|array{type: 'image', image: string}|null */
+    protected string|array|null $interactiveHeader = null;
 
     protected ?string $interactiveFooter = null;
 
@@ -239,10 +240,14 @@ class MessageBuilder
         return $this;
     }
 
-    public function headerImage(string $url): self
+    public function headerImage(string $urlOrMediaId): self
     {
         $this->headerType = 'image';
-        $this->headerValue = $url;
+        $this->headerValue = $urlOrMediaId;
+        $this->interactiveHeader = [
+            'type' => 'image',
+            'image' => $urlOrMediaId,
+        ];
 
         return $this;
     }
