@@ -61,7 +61,32 @@ WHATSAPP_QUEUE_NAME=whatsapp
 
 ### Creating a Phone Configuration
 
-Create a phone record in the database:
+Register each WhatsApp number as a row in `whatsapp_phones`:
+
+```bash
+php artisan whatsapp:phone:add support \
+    --phone-id=your_meta_phone_number_id \
+    --phone-number=+5511999999999 \
+    --business-account-id=your_waba_id \
+    --handler="App\WhatsApp\Handlers\SupportHandler" \
+    --batch-window=3
+```
+
+Without `--token` the phone inherits `WHATSAPP_ACCESS_TOKEN`. Pass `--token` on its own to be
+prompted for a token specific to this phone (it never shows up in your shell history), and rotate
+it the same way later:
+
+```bash
+php artisan whatsapp:phone:update support --token
+php artisan whatsapp:phone:list
+```
+
+`update` only touches the options you pass (`--phone-id`, `--phone-number`, `--business-account-id`,
+`--token`, `--handler`, `--batch-window`, `--active`, `--inactive`); `--handler` is checked to
+implement `MessageHandlerInterface` at registration time; `list` shows whether a phone carries its
+own token but never the token itself.
+
+The remaining settings can be set on the model directly:
 
 ```php
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppPhone;
@@ -735,6 +760,11 @@ Control which message types are accepted:
 ```bash
 # Install the package
 php artisan whatsapp:install
+
+# Register, change and list phone numbers (pass --token alone to be prompted for it)
+php artisan whatsapp:phone:add support --phone-id=123 --phone-number=+5511999999999 --business-account-id=456 --handler="App\WhatsApp\Handlers\SupportHandler"
+php artisan whatsapp:phone:update support --token
+php artisan whatsapp:phone:list
 
 # Sync message templates from Meta
 php artisan whatsapp:sync-templates

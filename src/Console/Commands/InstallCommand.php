@@ -82,15 +82,15 @@ class InstallCommand extends Command
         $this->line('     <comment>WHATSAPP_APP_SECRET=your_app_secret</comment>');
         $this->newLine();
 
-        $this->line('  2. Create a phone in your database:');
+        $this->line('  2. Register your phone number:');
         $this->newLine();
-        $this->line('     <comment>WhatsAppPhone::create([</comment>');
-        $this->line("         <comment>'key' => 'support',</comment>");
-        $this->line("         <comment>'phone_id' => 'your_phone_number_id',</comment>");
-        $this->line("         <comment>'phone_number' => '+5511999999999',</comment>");
-        $this->line("         <comment>'business_account_id' => 'your_waba_id',</comment>");
-        $this->line("         <comment>'handler' => App\\WhatsApp\\Handlers\\SupportHandler::class,</comment>");
-        $this->line('     <comment>]);</comment>');
+        $this->line('     <comment>php artisan whatsapp:phone:add support \</comment>');
+        $this->line('         <comment>--phone-id=your_phone_number_id \</comment>');
+        $this->line('         <comment>--phone-number=+5511999999999 \</comment>');
+        $this->line('         <comment>--business-account-id=your_waba_id \</comment>');
+        $this->line('         <comment>--handler="App\\WhatsApp\\Handlers\\SupportHandler"</comment>');
+        $this->newLine();
+        $this->line('     Add <comment>--token</comment> to be prompted for a token specific to this phone.');
         $this->newLine();
 
         $this->line('  3. Configure the webhook in Meta Business Suite:');

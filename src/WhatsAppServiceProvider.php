@@ -11,6 +11,9 @@ use Multek\LaravelWhatsAppCloud\Client\WhatsAppClientInterface;
 use Multek\LaravelWhatsAppCloud\Console\Commands\FlowKeyCommand;
 use Multek\LaravelWhatsAppCloud\Console\Commands\FlowTestCommand;
 use Multek\LaravelWhatsAppCloud\Console\Commands\InstallCommand;
+use Multek\LaravelWhatsAppCloud\Console\Commands\PhoneAddCommand;
+use Multek\LaravelWhatsAppCloud\Console\Commands\PhoneListCommand;
+use Multek\LaravelWhatsAppCloud\Console\Commands\PhoneUpdateCommand;
 use Multek\LaravelWhatsAppCloud\Console\Commands\ProcessStaleBatchesCommand;
 use Multek\LaravelWhatsAppCloud\Console\Commands\SyncTemplatesCommand;
 use Multek\LaravelWhatsAppCloud\Contracts\MediaStorageInterface;
@@ -101,6 +104,9 @@ class WhatsAppServiceProvider extends ServiceProvider
                 ProcessStaleBatchesCommand::class,
                 FlowKeyCommand::class,
                 FlowTestCommand::class,
+                PhoneAddCommand::class,
+                PhoneUpdateCommand::class,
+                PhoneListCommand::class,
             ]);
         }
     }
