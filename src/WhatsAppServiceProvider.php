@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Multek\LaravelWhatsAppCloud;
 
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Database\Migrations\Migrator;
 use Illuminate\Support\ServiceProvider;
 use Multek\LaravelWhatsAppCloud\Client\WhatsAppClient;
 use Multek\LaravelWhatsAppCloud\Client\WhatsAppClientInterface;
@@ -20,6 +21,7 @@ use Multek\LaravelWhatsAppCloud\Observers\WhatsAppPhoneObserver;
 use Multek\LaravelWhatsAppCloud\Services\MediaService;
 use Multek\LaravelWhatsAppCloud\Services\TranscriptionService;
 use Multek\LaravelWhatsAppCloud\Support\PricingCalculator;
+use RuntimeException;
 
 class WhatsAppServiceProvider extends ServiceProvider
 {
@@ -79,12 +81,103 @@ class WhatsAppServiceProvider extends ServiceProvider
     protected function publishMigrations(): void
     {
         if (static::$runsMigrations) {
-            $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+            $this->callAfterResolving('migrator', fn (Migrator $migrator) => $this->registerVendorMigrations($migrator));
         }
 
         $this->publishesMigrations([
             __DIR__.'/../database/migrations' => database_path('migrations'),
         ], 'whatsapp-migrations');
+    }
+
+    /**
+     * publishesMigrations() rewrites the date prefix, so to Laravel a published copy and its vendor
+     * source are two migrations: copies still on disk keep precedence, deleted ones get their history adopted.
+     */
+    protected function registerVendorMigrations(Migrator $migrator): void
+    {
+        $vendor = $this->keyBySuffix(glob(__DIR__.'/../database/migrations/*_*.php') ?: []);
+        $published = array_intersect_key($this->keyBySuffix(glob(database_path('migrations').'/*_*.php') ?: []), $vendor);
+        $unpublished = array_diff_key($vendor, $published);
+
+        if ($unpublished === []) {
+            return;
+        }
+
+        $ran = $migrator->repositoryExists() ? $migrator->getRepository()->getRan() : [];
+
+        $pendingCopies = array_diff(array_map($this->migrationName(...), $published), $ran);
+
+        if ($pendingCopies !== []) {
+            throw new RuntimeException(sprintf(
+                'The published copies of the whatsapp migrations in %s have not run yet, but the package also ships %s, which Laravel would run before them. Delete the published copies (the package loads them from vendor/ and adopts any history recorded under the published names) or call %s::ignoreMigrations().',
+                database_path('migrations'),
+                implode(', ', array_map($this->migrationName(...), $unpublished)),
+                static::class,
+            ));
+        }
+
+        $this->adoptPublishedHistory($migrator, $unpublished, $ran);
+
+        foreach ($unpublished as $file) {
+            $migrator->path($file);
+        }
+    }
+
+    /**
+     * @param  array<string, string>  $vendor  suffix => file
+     * @param  array<int, string>  $ran
+     */
+    protected function adoptPublishedHistory(Migrator $migrator, array $vendor, array $ran): void
+    {
+        $ranBySuffix = $this->keyBySuffix($ran);
+
+        foreach ($vendor as $suffix => $file) {
+            $name = $this->migrationName($file);
+            $previous = $ranBySuffix[$suffix] ?? null;
+
+            if ($previous === null || in_array($name, $ran, true)) {
+                continue;
+            }
+
+            $migrator->resolveConnection($migrator->getConnection())
+                ->table($this->migrationsTable())
+                ->where('migration', $previous)
+                ->update(['migration' => $name]);
+        }
+    }
+
+    protected function migrationsTable(): string
+    {
+        $config = $this->app['config']->get('database.migrations', 'migrations');
+
+        return is_array($config) ? ($config['table'] ?? 'migrations') : $config;
+    }
+
+    /**
+     * @param  array<int, string>  $files
+     * @return array<string, string> suffix => file
+     */
+    protected function keyBySuffix(array $files): array
+    {
+        $keyed = [];
+
+        foreach ($files as $file) {
+            $keyed[$this->migrationSuffix($file)] = $file;
+        }
+
+        return $keyed;
+    }
+
+    protected function migrationName(string $file): string
+    {
+        return basename($file, '.php');
+    }
+
+    protected function migrationSuffix(string $file): string
+    {
+        $name = $this->migrationName($file);
+
+        return preg_replace('/^\d{4}_\d{2}_\d{2}_\d{6}_/', '', $name) ?? $name;
     }
 
     protected function loadRoutes(): void
