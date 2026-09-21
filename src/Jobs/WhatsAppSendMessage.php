@@ -10,9 +10,11 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Storage;
 use Multek\LaravelWhatsAppCloud\Client\WhatsAppClient;
 use Multek\LaravelWhatsAppCloud\Events\MessageFailed;
 use Multek\LaravelWhatsAppCloud\Events\MessageSent;
+use Multek\LaravelWhatsAppCloud\Exceptions\MessageSendException;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppMessage;
 
 class WhatsAppSendMessage implements ShouldQueue
@@ -44,6 +46,8 @@ class WhatsAppSendMessage implements ShouldQueue
         $client = new WhatsAppClient($phone);
 
         try {
+            $this->uploadStoredMedia($client, $message);
+
             $result = $this->sendMessage($client, $message);
 
             // Update message with the actual WhatsApp message ID
@@ -69,6 +73,29 @@ class WhatsAppSendMessage implements ShouldQueue
 
             throw $e;
         }
+    }
+
+    /**
+     * A message queued with a local file carries its copy on disk but no Meta media id yet.
+     */
+    protected function uploadStoredMedia(WhatsAppClient $client, WhatsAppMessage $message): void
+    {
+        if (! $message->isMedia() || $message->media_id !== null || ! $message->local_media_path || ! $message->local_media_disk) {
+            return;
+        }
+
+        $result = $client->uploadMediaContents(
+            Storage::disk($message->local_media_disk)->get($message->local_media_path) ?? '',
+            $message->media_mime_type ?? 'application/octet-stream',
+            basename($message->local_media_path)
+        );
+
+        $mediaId = $result['id'] ?? throw MessageSendException::mediaUploadFailed('no media id returned');
+
+        $message->update([
+            'media_id' => $mediaId,
+            'content' => ['id' => $mediaId] + ($message->content ?? []),
+        ]);
     }
 
     /**

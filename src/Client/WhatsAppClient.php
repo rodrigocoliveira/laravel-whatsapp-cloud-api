@@ -441,8 +441,16 @@ class WhatsAppClient implements WhatsAppClientInterface
      */
     public function uploadMedia(string $filePath, string $mimeType): array
     {
+        return $this->uploadMediaContents((string) file_get_contents($filePath), $mimeType, basename($filePath));
+    }
+
+    /**
+     * Upload raw media contents to WhatsApp under the given file name.
+     */
+    public function uploadMediaContents(string $contents, string $mimeType, string $filename): array
+    {
         $response = $this->http()
-            ->attach('file', file_get_contents($filePath), basename($filePath))
+            ->attach('file', $contents, $filename)
             ->post($this->getMediaEndpoint(), [
                 'messaging_product' => 'whatsapp',
                 'type' => $mimeType,

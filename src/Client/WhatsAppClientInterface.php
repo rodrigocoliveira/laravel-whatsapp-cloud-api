@@ -154,6 +154,13 @@ interface WhatsAppClientInterface
     public function uploadMedia(string $filePath, string $mimeType): array;
 
     /**
+     * Upload raw media contents under the given file name.
+     *
+     * @return array<string, mixed> Meta's response, `id` on success
+     */
+    public function uploadMediaContents(string $contents, string $mimeType, string $filename): array;
+
+    /**
      * Get the URL for a media file.
      */
     public function getMediaUrl(string $mediaId): string;
