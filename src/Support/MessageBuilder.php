@@ -48,6 +48,8 @@ class MessageBuilder
 
     protected ?string $headerValue = null;
 
+    protected ?string $headerFilename = null;
+
     /** @var array<int, string> */
     protected array $bodyParameters = [];
 
@@ -260,10 +262,11 @@ class MessageBuilder
         return $this;
     }
 
-    public function headerDocument(string $url): self
+    public function headerDocument(string $url, ?string $filename = null): self
     {
         $this->headerType = 'document';
         $this->headerValue = $url;
+        $this->headerFilename = $filename;
 
         return $this;
     }
@@ -582,9 +585,15 @@ class MessageBuilder
             if ($this->headerType === 'text') {
                 $headerComponent['parameters'][] = ['type' => 'text', 'text' => $this->headerValue];
             } else {
+                $media = ['link' => $this->headerValue];
+
+                if ($this->headerType === 'document' && $this->headerFilename !== null) {
+                    $media['filename'] = $this->headerFilename;
+                }
+
                 $headerComponent['parameters'][] = [
                     'type' => $this->headerType,
-                    $this->headerType => ['link' => $this->headerValue],
+                    $this->headerType => $media,
                 ];
             }
 
