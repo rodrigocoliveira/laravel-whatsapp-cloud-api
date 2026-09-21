@@ -79,6 +79,12 @@ class WhatsAppMessage extends Model
 
     protected static function booted(): void
     {
+        static::created(function (self $message): void {
+            if ($message->local_media_path) {
+                $message->requestTranscription();
+            }
+        });
+
         static::updated(function (self $message): void {
             if (! $message->wasChanged('local_media_path') || ! $message->local_media_path) {
                 return;

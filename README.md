@@ -146,11 +146,28 @@ WhatsApp::phone('support')
     ->caption('Check this out!')
     ->send();
 
-// Send a document
+// Send a document by URL (or by a media id already uploaded to Meta)
 WhatsApp::phone('support')
     ->to('+5511999999999')
     ->document('https://example.com/file.pdf')
     ->filename('report.pdf')
+    ->send();
+
+// Send a local file: pass an UploadedFile or Illuminate\Http\File instead of a URL.
+// The package uploads it to Meta, keeps a copy on the media disk and fills the media
+// columns (media_id, media_mime_type, media_size, local_media_path, ...) before
+// MessageSent fires; an audio file is transcribed like an inbound one when the phone
+// has transcription enabled. queue() stores the copy right away and uploads from it
+// when the job runs.
+WhatsApp::phone('support')
+    ->to('+5511999999999')
+    ->audio($request->file('voice_note'))
+    ->send();
+
+WhatsApp::phone('support')
+    ->to('+5511999999999')
+    ->document(new \Illuminate\Http\File(storage_path('app/pedido.pdf')))
+    ->filename('pedido-corbi.pdf') // defaults to the file's own name
     ->send();
 
 // Send interactive buttons

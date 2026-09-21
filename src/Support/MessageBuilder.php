@@ -4,13 +4,18 @@ declare(strict_types=1);
 
 namespace Multek\LaravelWhatsAppCloud\Support;
 
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
 use Multek\LaravelWhatsAppCloud\Client\WhatsAppClientInterface;
 use Multek\LaravelWhatsAppCloud\Events\MessageSent;
+use Multek\LaravelWhatsAppCloud\Exceptions\MessageSendException;
 use Multek\LaravelWhatsAppCloud\Jobs\WhatsAppSendMessage;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppConversation;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppMessage;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppPhone;
+use Multek\LaravelWhatsAppCloud\Services\MediaService;
+use SplFileInfo;
+use Symfony\Component\HttpFoundation\File\File as SymfonyFile;
 
 class MessageBuilder
 {
@@ -29,6 +34,11 @@ class MessageBuilder
     protected ?string $caption = null;
 
     protected ?string $filename = null;
+
+    protected ?SplFileInfo $mediaFile = null;
+
+    /** @var array<string, mixed> */
+    protected array $mediaAttributes = [];
 
     // Location
     protected ?float $latitude = null;
@@ -159,43 +169,43 @@ class MessageBuilder
         return $this;
     }
 
-    // Media
-    public function image(string $urlOrMediaId): self
+    // Media: a string is a URL or a Meta media id; an UploadedFile or Illuminate\Http\File
+    // is uploaded to Meta and kept on the media disk.
+    public function image(SplFileInfo|string $source): self
     {
-        $this->messageType = 'image';
-        $this->mediaUrlOrId = $urlOrMediaId;
-
-        return $this;
+        return $this->media('image', $source);
     }
 
-    public function video(string $urlOrMediaId): self
+    public function video(SplFileInfo|string $source): self
     {
-        $this->messageType = 'video';
-        $this->mediaUrlOrId = $urlOrMediaId;
-
-        return $this;
+        return $this->media('video', $source);
     }
 
-    public function audio(string $urlOrMediaId): self
+    public function audio(SplFileInfo|string $source): self
     {
-        $this->messageType = 'audio';
-        $this->mediaUrlOrId = $urlOrMediaId;
-
-        return $this;
+        return $this->media('audio', $source);
     }
 
-    public function document(string $urlOrMediaId): self
+    public function document(SplFileInfo|string $source): self
     {
-        $this->messageType = 'document';
-        $this->mediaUrlOrId = $urlOrMediaId;
-
-        return $this;
+        return $this->media('document', $source);
     }
 
-    public function sticker(string $urlOrMediaId): self
+    public function sticker(SplFileInfo|string $source): self
     {
-        $this->messageType = 'sticker';
-        $this->mediaUrlOrId = $urlOrMediaId;
+        return $this->media('sticker', $source);
+    }
+
+    protected function media(string $type, SplFileInfo|string $source): self
+    {
+        $this->messageType = $type;
+        $this->mediaFile = $source instanceof SplFileInfo ? $source : null;
+        $this->mediaUrlOrId = is_string($source) ? $source : null;
+        $this->mediaAttributes = [];
+
+        if ($type === 'document' && $this->mediaFile !== null) {
+            $this->filename ??= $this->mediaFileName();
+        }
 
         return $this;
     }
@@ -454,6 +464,7 @@ class MessageBuilder
     public function send(): WhatsAppMessage
     {
         $this->ensureRecipient();
+        $this->uploadMediaFile();
 
         $result = $this->executeApiCall();
 
@@ -467,6 +478,7 @@ class MessageBuilder
     public function queue(): WhatsAppMessage
     {
         $this->ensureRecipient();
+        $this->storeMediaFile();
 
         $message = $this->createPendingMessage();
 
@@ -645,7 +657,7 @@ class MessageBuilder
             'template_name' => $this->templateName,
             'template_parameters' => $this->buildTemplateParametersForRecord(),
             'metadata' => $this->metadata ?: null,
-        ]);
+        ] + $this->mediaAttributes);
     }
 
     protected function createPendingMessage(): WhatsAppMessage
@@ -665,7 +677,7 @@ class MessageBuilder
             'template_name' => $this->templateName,
             'template_parameters' => $this->buildTemplateParametersForRecord(),
             'metadata' => $this->metadata ?: null,
-        ]);
+        ] + $this->mediaAttributes);
     }
 
     protected function ensureRecipient(): string
@@ -694,6 +706,66 @@ class MessageBuilder
         return $this->flowTokenValue ??= (string) Str::uuid();
     }
 
+    /**
+     * Upload the local file to Meta and keep a copy on the media disk, so the record
+     * is complete (media id, local path, size) by the time MessageSent fires.
+     */
+    protected function uploadMediaFile(): void
+    {
+        if ($this->mediaFile === null) {
+            return;
+        }
+
+        $contents = (string) file_get_contents($this->mediaFile->getPathname());
+        $mimeType = $this->mediaFileMimeType();
+
+        $result = $this->client->uploadMediaContents($contents, $mimeType, $this->mediaFileName());
+        $mediaId = $result['id'] ?? throw MessageSendException::mediaUploadFailed('no media id returned');
+
+        $this->storeMediaFile($contents, $mimeType);
+
+        $this->mediaUrlOrId = $mediaId;
+        $this->mediaAttributes['media_id'] = $mediaId;
+    }
+
+    /**
+     * Keep a copy on the media disk; a queued message is uploaded from it by the job.
+     */
+    protected function storeMediaFile(?string $contents = null, ?string $mimeType = null): void
+    {
+        if ($this->mediaFile === null || isset($this->mediaAttributes['local_media_path'])) {
+            return;
+        }
+
+        $contents ??= (string) file_get_contents($this->mediaFile->getPathname());
+        $mimeType ??= $this->mediaFileMimeType();
+
+        ['disk' => $disk, 'path' => $path] = app(MediaService::class)->store($contents, $mimeType);
+
+        $this->mediaAttributes += [
+            'media_mime_type' => $mimeType,
+            'media_size' => (int) $this->mediaFile->getSize(),
+            'media_status' => WhatsAppMessage::MEDIA_STATUS_DOWNLOADED,
+            'local_media_disk' => $disk,
+            'local_media_path' => $path,
+        ];
+    }
+
+    protected function mediaFileMimeType(): string
+    {
+        $file = $this->mediaFile;
+        $mimeType = $file instanceof SymfonyFile ? $file->getMimeType() : mime_content_type($file->getPathname());
+
+        return $mimeType ?: 'application/octet-stream';
+    }
+
+    protected function mediaFileName(): string
+    {
+        return $this->mediaFile instanceof UploadedFile
+            ? $this->mediaFile->getClientOriginalName()
+            : $this->mediaFile->getFilename();
+    }
+
     protected function resolveMessageTypeForRecord(): string
     {
         return match ($this->messageType) {
@@ -710,7 +782,9 @@ class MessageBuilder
         return match ($this->messageType) {
             'text' => ['body' => $this->textBody, 'preview_url' => $this->previewUrl],
             'image', 'video', 'audio', 'document', 'sticker' => array_filter([
-                'url' => $this->mediaUrlOrId,
+                'url' => $this->mediaFile === null ? $this->mediaUrlOrId : null,
+                'id' => $this->mediaFile === null ? null : $this->mediaUrlOrId,
+                'mime_type' => $this->mediaAttributes['media_mime_type'] ?? null,
                 'caption' => $this->caption,
                 'filename' => $this->filename,
             ]),

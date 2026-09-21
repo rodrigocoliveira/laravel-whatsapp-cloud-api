@@ -41,17 +41,8 @@ class MediaService implements MediaStorageInterface
                 throw MediaDownloadException::fileTooLarge(strlen($content), $maxSize);
             }
 
-            // Determine storage path
-            $disk = config('whatsapp.media.storage_disk', 'local');
-            $basePath = config('whatsapp.media.storage_path', 'whatsapp/media');
-            $extension = $this->getExtensionFromMimeType($message->media_mime_type);
-            $filename = Str::uuid()->toString().'.'.$extension;
-            $path = $basePath.'/'.date('Y/m/d').'/'.$filename;
+            ['disk' => $disk, 'path' => $path] = $this->store($content, $message->media_mime_type);
 
-            // Store the file
-            Storage::disk($disk)->put($path, $content);
-
-            // Update message with media info
             $message->update([
                 'local_media_path' => $path,
                 'local_media_disk' => $disk,
@@ -68,6 +59,22 @@ class MediaService implements MediaStorageInterface
                 $e->getMessage()
             );
         }
+    }
+
+    /**
+     * Store media contents on the media disk under the same date-based layout as downloads.
+     *
+     * @return array{disk: string, path: string}
+     */
+    public function store(string $contents, ?string $mimeType): array
+    {
+        $disk = config('whatsapp.media.storage_disk', 'local');
+        $basePath = config('whatsapp.media.storage_path', 'whatsapp/media');
+        $path = $basePath.'/'.date('Y/m/d').'/'.Str::uuid()->toString().'.'.$this->getExtensionFromMimeType($mimeType);
+
+        Storage::disk($disk)->put($path, $contents);
+
+        return ['disk' => $disk, 'path' => $path];
     }
 
     /**
