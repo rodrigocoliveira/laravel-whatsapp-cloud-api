@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Multek\LaravelWhatsAppCloud;
 
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Support\ServiceProvider;
-use Multek\LaravelWhatsAppCloud\Client\WhatsAppClient;
 use Multek\LaravelWhatsAppCloud\Client\WhatsAppClientInterface;
 use Multek\LaravelWhatsAppCloud\Console\Commands\FlowKeyCommand;
 use Multek\LaravelWhatsAppCloud\Console\Commands\FlowTestCommand;
@@ -43,7 +43,13 @@ class WhatsAppServiceProvider extends ServiceProvider
             return new WhatsAppManager($app);
         });
 
-        $this->app->bind(WhatsAppClientInterface::class, WhatsAppClient::class);
+        // Autowiring WhatsAppClient here gave it an empty phone that silently fell back to the app-wide token.
+        $this->app->bind(WhatsAppClientInterface::class, function (): never {
+            throw new BindingResolutionException(
+                'WhatsAppClientInterface cannot be resolved from the container: a client is always bound to a phone. '
+                .'Build it with new WhatsAppClient($phone) or take it from WhatsApp::phone(\'key\')->getClient().'
+            );
+        });
         $this->app->bind(MediaStorageInterface::class, MediaService::class);
         $this->app->bind(TranscriptionServiceInterface::class, TranscriptionService::class);
 
