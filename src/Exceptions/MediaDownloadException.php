@@ -26,6 +26,25 @@ class MediaDownloadException extends WhatsAppException
         return new self("Media with ID '{$mediaId}' not found on WhatsApp servers.");
     }
 
+    /**
+     * @param  array<string, mixed>|null  $error  Meta's `error` object from the rejected response
+     */
+    public static function lookupFailed(string $mediaId, int $status, ?array $error = null): self
+    {
+        $reason = $error['message'] ?? 'no error details returned';
+
+        if (isset($error['code'])) {
+            $reason = "[{$error['code']}] {$reason}";
+        }
+
+        return new self(
+            "Failed to look up media '{$mediaId}' on WhatsApp servers (HTTP {$status}): {$reason}",
+            (int) ($error['code'] ?? 0),
+            null,
+            $error
+        );
+    }
+
     public static function fileTooLarge(int $size, int $maxSize): self
     {
         $sizeMb = round($size / 1024 / 1024, 2);

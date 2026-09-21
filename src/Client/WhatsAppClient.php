@@ -463,7 +463,7 @@ class WhatsAppClient implements WhatsAppClientInterface
         $response = $this->http()->get("{$this->baseUrl}/{$this->apiVersion}/{$mediaId}");
 
         if (! $response->successful()) {
-            throw MediaDownloadException::mediaNotFound($mediaId);
+            throw MediaDownloadException::lookupFailed($mediaId, $response->status(), $response->json('error'));
         }
 
         return $response->json('url');

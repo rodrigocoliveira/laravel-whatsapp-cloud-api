@@ -6,17 +6,15 @@ namespace Multek\LaravelWhatsAppCloud\Services;
 
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Multek\LaravelWhatsAppCloud\Client\WhatsAppClient;
 use Multek\LaravelWhatsAppCloud\Client\WhatsAppClientInterface;
 use Multek\LaravelWhatsAppCloud\Contracts\MediaStorageInterface;
 use Multek\LaravelWhatsAppCloud\Exceptions\MediaDownloadException;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppMessage;
+use Multek\LaravelWhatsAppCloud\Models\WhatsAppPhone;
 
 class MediaService implements MediaStorageInterface
 {
-    public function __construct(
-        protected WhatsAppClientInterface $client,
-    ) {}
-
     /**
      * Download media from WhatsApp and store it locally.
      *
@@ -29,11 +27,7 @@ class MediaService implements MediaStorageInterface
         }
 
         try {
-            // Get the media URL from WhatsApp API
-            $mediaUrl = $this->client->getMediaUrl($message->media_id);
-
-            // Download the media content
-            $content = $this->client->downloadMedia($message->media_id);
+            $content = $this->clientFor($message->phone)->downloadMedia($message->media_id);
 
             // Check file size
             $maxSize = config('whatsapp.media.max_size', 16 * 1024 * 1024);
@@ -112,6 +106,15 @@ class MediaService implements MediaStorageInterface
         }
 
         return $deleted;
+    }
+
+    /**
+     * Media lookups are authorized per phone: a client resolved from the container
+     * carries an empty phone and silently falls back to the app-wide token.
+     */
+    protected function clientFor(WhatsAppPhone $phone): WhatsAppClientInterface
+    {
+        return new WhatsAppClient($phone);
     }
 
     /**
