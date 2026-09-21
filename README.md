@@ -38,7 +38,7 @@ Run the migrations:
 php artisan migrate
 ```
 
-> Since v1.4.0 the package's migrations run automatically on `php artisan migrate` (loaded straight from vendor/), so future releases that add or change a migration no longer require re-publishing. If you previously ran `vendor:publish --tag=whatsapp-migrations` and customized your copy, call `WhatsAppServiceProvider::ignoreMigrations()` from your own service provider's `register()` method to keep using only your published copy.
+> Since v1.4.0 the package's migrations run automatically on `php artisan migrate` (loaded straight from vendor/), so future releases that add or change a migration no longer require re-publishing. If you ran `vendor:publish --tag=whatsapp-migrations` on an earlier version, delete those copies from `database/migrations` after upgrading: on the next `migrate` the package renames their rows in the `migrations` table to the vendor file names, so nothing runs twice and new migrations load normally. While the copies are still on disk they keep precedence on databases that already ran them, but a fresh database (`migrate:fresh`) refuses to run in that state and tells you to delete them. A hand-written equivalent under a different name is not recognized; rename its row in `migrations` to the package's file name. To opt out of vendor-loaded migrations entirely, call `WhatsAppServiceProvider::ignoreMigrations()` from your service provider's `register()` method.
 
 ## Configuration
 
