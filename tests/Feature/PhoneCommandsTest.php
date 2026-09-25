@@ -40,7 +40,7 @@ describe('whatsapp:phone:add', function () {
             ->expectsQuestion('Access token', 'EAAB.rotated')
             ->assertSuccessful();
 
-        expect(WhatsAppPhone::where('key', 'support')->first()->getRawOriginal('access_token'))->toBe('EAAB.rotated');
+        expect(WhatsAppPhone::where('key', 'support')->first()->access_token)->toBe('EAAB.rotated');
     });
 
     it('registers an inactive phone with --inactive', function () {
@@ -119,7 +119,7 @@ describe('whatsapp:phone:update', function () {
         expect($phone->batch_window_seconds)->toBe(8)
             ->and($phone->phone_id)->toBe('10987654321')
             ->and($phone->handler)->toBe(PhoneCommandsTestHandler::class)
-            ->and($phone->getRawOriginal('access_token'))->toBe('EAAB.old')
+            ->and($phone->access_token)->toBe('EAAB.old')
             ->and($phone->is_active)->toBeTrue();
     });
 
@@ -128,7 +128,7 @@ describe('whatsapp:phone:update', function () {
             ->expectsQuestion('Access token', 'EAAB.new')
             ->assertSuccessful();
 
-        expect($this->phone->fresh()->getRawOriginal('access_token'))->toBe('EAAB.new');
+        expect($this->phone->fresh()->access_token)->toBe('EAAB.new');
     });
 
     it('toggles activation with --inactive and --active', function () {

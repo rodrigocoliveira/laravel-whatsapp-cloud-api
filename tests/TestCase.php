@@ -34,6 +34,9 @@ abstract class TestCase extends BaseTestCase
             'prefix' => '',
         ]);
 
+        // Phone access tokens are encrypted at rest with the app key
+        $app['config']->set('app.key', 'base64:'.base64_encode(str_repeat('a', 32)));
+
         // Setup WhatsApp config
         $app['config']->set('whatsapp.access_token', 'test_token');
         $app['config']->set('whatsapp.webhook.verify_token', 'test_verify_token');
