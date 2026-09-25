@@ -189,4 +189,22 @@ describe('access token encryption at rest', function () {
             ->and(fn () => $phone->fresh()->update(['display_name' => 'Support']))->toThrow(DecryptException::class)
             ->and(rawToken($phone))->toBe($foreign);
     });
+
+    it('never exposes the token through array or json serialization', function () {
+        $phone = phoneWithToken('EAAB.secret')->fresh();
+
+        expect($phone->toArray())->not->toHaveKey('access_token')
+            ->and($phone->toJson())->not->toContain('EAAB.secret')
+            ->and($phone->toJson())->not->toContain('access_token')
+            ->and($phone->access_token)->toBe('EAAB.secret');
+    });
+
+    it('decrypts the token on a phone rebuilt from cached raw attributes', function () {
+        $attributes = phoneWithToken('EAAB.secret')->fresh()->getAttributes();
+
+        $phone = (new WhatsAppPhone)->newFromBuilder($attributes);
+
+        expect($attributes['access_token'])->not->toBe('EAAB.secret')
+            ->and($phone->access_token)->toBe('EAAB.secret');
+    });
 });

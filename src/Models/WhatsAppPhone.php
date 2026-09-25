@@ -72,6 +72,13 @@ class WhatsAppPhone extends Model
         'metadata',
     ];
 
+    /**
+     * Never let the token leak through toArray()/toJson(); read it via $phone->access_token.
+     */
+    protected $hidden = [
+        'access_token',
+    ];
+
     protected $casts = [
         'handler_config' => 'array',
         'allowed_message_types' => 'array',

@@ -87,7 +87,7 @@ implement `MessageHandlerInterface` at registration time; `list` shows whether a
 own token but never the token itself.
 
 A phone's own token is encrypted at rest with your `APP_KEY`; `$phone->access_token` always reads it
-back decrypted. Tokens stored in plaintext by earlier versions keep working and are encrypted the
+back decrypted, and the token is hidden from `toArray()`/`toJson()`. Tokens stored in plaintext by earlier versions keep working and are encrypted the
 next time their phone is saved. Rotating `APP_KEY` needs the old key in `APP_PREVIOUS_KEYS`, or the
 stored tokens can no longer be read.
 
