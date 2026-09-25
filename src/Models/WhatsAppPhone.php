@@ -72,6 +72,13 @@ class WhatsAppPhone extends Model
         'metadata',
     ];
 
+    /**
+     * Never let the token leak through toArray()/toJson(); read it via $phone->access_token.
+     */
+    protected $hidden = [
+        'access_token',
+    ];
+
     protected $casts = [
         'handler_config' => 'array',
         'allowed_message_types' => 'array',
@@ -129,9 +136,35 @@ class WhatsAppPhone extends Model
         return $this->hasMany(WhatsAppTemplate::class, 'whatsapp_phone_id');
     }
 
+    protected static function booted(): void
+    {
+        // Rows written before tokens were encrypted still hold plaintext; seal them on the next save.
+        static::saving(function (WhatsAppPhone $phone): void {
+            $raw = $phone->attributes['access_token'] ?? null;
+
+            if ($raw !== null && static::decryptToken($raw) === null) {
+                $phone->attributes['access_token'] = static::currentEncrypter()->encrypt($raw, false);
+            }
+        });
+    }
+
+    /**
+     * The token is encrypted at rest; a legacy plaintext value is read as-is.
+     */
     public function getAccessTokenAttribute(?string $value): string
     {
-        return $value ?? config('whatsapp.access_token', '');
+        if ($value === null) {
+            return config('whatsapp.access_token', '');
+        }
+
+        return static::decryptToken($value) ?? $value;
+    }
+
+    public function setAccessTokenAttribute(#[\SensitiveParameter] ?string $value): void
+    {
+        $this->attributes['access_token'] = $value === null
+            ? null
+            : static::currentEncrypter()->encrypt($value, false);
     }
 
     public function isMessageTypeAllowed(string $type): bool
@@ -143,6 +176,23 @@ class WhatsAppPhone extends Model
         }
 
         return in_array($type, $allowedTypes, true);
+    }
+
+    /**
+     * Decrypt a stored token, or return null when it is legacy plaintext.
+     *
+     * Only values that are not shaped like an encrypted payload count as plaintext, so a payload
+     * sealed with another APP_KEY still throws instead of being sent to Meta (and re-encrypted) as-is.
+     */
+    protected static function decryptToken(string $value): ?string
+    {
+        $payload = json_decode((string) base64_decode($value, true), true);
+
+        if (! is_array($payload) || ! isset($payload['iv'], $payload['value'], $payload['mac'])) {
+            return null;
+        }
+
+        return static::currentEncrypter()->decrypt($value, false);
     }
 
     public function isBatchMode(): bool
