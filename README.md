@@ -470,6 +470,7 @@ Event::listen(MediaDownloaded::class, function (MediaDownloaded $event) {
 | `MessageFailed` | When message send fails |
 | `MediaDownloaded` | After media saved locally |
 | `AudioTranscribed` | After audio transcribed |
+| `AudioTranscriptionFailed` | After transcription retries are exhausted (reason in `error_message`) |
 
 ### Message Pricing
 

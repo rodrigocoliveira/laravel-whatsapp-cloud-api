@@ -105,7 +105,7 @@ WhatsAppProcessIncomingMessage
 
 Inbound: `MessageReceived`, `MessageFiltered`, `MessageReady`, `BatchReady`, `BatchProcessed`
 Outbound: `MessageSent`, `MessageDelivered`, `MessageRead`, `MessageFailed`
-Media: `MediaDownloaded`, `AudioTranscribed`
+Media: `MediaDownloaded`, `AudioTranscribed`, `AudioTranscriptionFailed`
 
 ## Adding New Features
 
