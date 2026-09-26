@@ -12,6 +12,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Storage;
 use Multek\LaravelWhatsAppCloud\Events\AudioTranscribed;
+use Multek\LaravelWhatsAppCloud\Events\AudioTranscriptionFailed;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppMessage;
 use Multek\LaravelWhatsAppCloud\Services\TranscriptionService;
 
@@ -127,6 +128,8 @@ class WhatsAppTranscribeAudio implements ShouldQueue
 
         // Mark as ready anyway so batch processing can continue
         $this->advanceInboundPipeline($this->message);
+
+        event(new AudioTranscriptionFailed($this->message));
     }
 
     /**

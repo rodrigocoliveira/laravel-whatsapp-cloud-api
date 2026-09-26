@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Multek\LaravelWhatsAppCloud\DTOs\TranscriptionResult;
 use Multek\LaravelWhatsAppCloud\Events\AudioTranscribed;
+use Multek\LaravelWhatsAppCloud\Events\AudioTranscriptionFailed;
 use Multek\LaravelWhatsAppCloud\Events\MessageReady;
 use Multek\LaravelWhatsAppCloud\Jobs\WhatsAppTranscribeAudio;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppMessage;
@@ -150,7 +151,7 @@ it('marks an inbound audio message ready after transcription as before', functio
 });
 
 it('marks an outbound audio message failed without touching status when transcription fails permanently', function () {
-    Event::fake([MessageReady::class]);
+    Event::fake([MessageReady::class, AudioTranscriptionFailed::class]);
 
     $message = makeAudioMessage($this->phone, WhatsAppMessage::DIRECTION_OUTBOUND);
     $message->update([
@@ -167,6 +168,7 @@ it('marks an outbound audio message failed without touching status when transcri
         ->and($message->transcription_status)->toBe(WhatsAppMessage::TRANSCRIPTION_STATUS_FAILED);
 
     Event::assertNotDispatched(MessageReady::class);
+    Event::assertDispatched(AudioTranscriptionFailed::class, fn (AudioTranscriptionFailed $event) => $event->message->is($message));
 });
 
 it('requestTranscription returns false for a non-audio message', function () {

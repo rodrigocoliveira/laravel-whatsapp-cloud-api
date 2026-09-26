@@ -8,7 +8,7 @@ use Multek\LaravelWhatsAppCloud\Contracts\TranscriptionServiceInterface;
 use Multek\LaravelWhatsAppCloud\DTOs\TranscriptionResult;
 use Multek\LaravelWhatsAppCloud\Exceptions\TranscriptionException;
 use OpenAI;
-use OpenAI\Client;
+use OpenAI\Contracts\ClientContract;
 
 class OpenAITranscriber implements TranscriptionServiceInterface
 {
@@ -25,7 +25,7 @@ class OpenAITranscriber implements TranscriptionServiceInterface
         'audio/x-wav',
     ];
 
-    protected ?Client $client = null;
+    protected ?ClientContract $client = null;
 
     /**
      * Transcribe an audio file to text using OpenAI Whisper.
@@ -50,6 +50,8 @@ class OpenAITranscriber implements TranscriptionServiceInterface
                 'response_format' => 'verbose_json',
             ]);
 
+            $this->throwIfErrorPayload($response->text);
+
             return new TranscriptionResult(
                 text: trim($response->text),
                 detectedLanguage: $response->language ?? null,
@@ -61,6 +63,28 @@ class OpenAITranscriber implements TranscriptionServiceInterface
         } catch (\Exception $e) {
             throw TranscriptionException::transcriptionFailed($e->getMessage());
         }
+    }
+
+    /**
+     * openai-php/client returns text/plain error bodies (e.g. a 401 for an
+     * invalid API key) as the transcript instead of throwing, so detect them here.
+     *
+     * @throws TranscriptionException
+     */
+    protected function throwIfErrorPayload(string $text): void
+    {
+        $decoded = json_decode(trim($text), true);
+
+        if (! is_array($decoded) || ! array_key_exists('error', $decoded)) {
+            return;
+        }
+
+        $error = $decoded['error'];
+        $reason = is_array($error) ? ($error['message'] ?? null) : $error;
+
+        throw TranscriptionException::transcriptionFailed(
+            is_string($reason) && $reason !== '' ? $reason : 'OpenAI returned an error response.'
+        );
     }
 
     /**
@@ -76,7 +100,7 @@ class OpenAITranscriber implements TranscriptionServiceInterface
      *
      * @throws TranscriptionException
      */
-    protected function getClient(): Client
+    protected function getClient(): ClientContract
     {
         if ($this->client !== null) {
             return $this->client;
@@ -103,7 +127,7 @@ class OpenAITranscriber implements TranscriptionServiceInterface
     /**
      * Set a custom client (useful for testing).
      */
-    public function setClient(Client $client): void
+    public function setClient(ClientContract $client): void
     {
         $this->client = $client;
     }
