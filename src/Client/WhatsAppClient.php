@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Multek\LaravelWhatsAppCloud\Exceptions\MediaDownloadException;
 use Multek\LaravelWhatsAppCloud\Exceptions\MessageSendException;
+use Multek\LaravelWhatsAppCloud\Exceptions\TemplateSyncException;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppPhone;
 use Multek\LaravelWhatsAppCloud\Support\PhoneNumberHelper;
 
@@ -506,22 +507,62 @@ class WhatsAppClient implements WhatsAppClientInterface
     }
 
     /**
-     * Get templates for the business account.
+     * Get every template for the business account, following Meta's pagination.
+     *
+     * A page with `data: []` means zero templates. A failed page, a successful page
+     * without a `data` array, or a repeated `paging.next` URL throws instead, so a
+     * partial or unreadable result is never mistaken for a complete list.
+     *
+     * @throws TemplateSyncException when any page fails or is malformed; a partial list is never returned
      */
     public function getTemplates(?string $status = null): array
     {
-        $params = [];
-        if ($status) {
-            $params['status'] = $status;
+        $query = array_filter([
+            'fields' => 'id,name,language,status,category,components,parameter_format,rejected_reason',
+            'limit' => 100,
+            'status' => $status,
+        ]);
+
+        $templates = [];
+        $url = $this->getTemplatesEndpoint();
+        $visited = [];
+
+        while ($url !== null) {
+            if (isset($visited[$url])) {
+                throw TemplateSyncException::malformedPage("paging.next repeated an already visited page ({$url})");
+            }
+
+            $visited[$url] = true;
+
+            // Only pass query array if not empty; paging.next URL already has query params
+            $response = $query
+                ? $this->http()->get($url, $query)
+                : $this->http()->get($url);
+
+            if (! $response->successful()) {
+                throw TemplateSyncException::fetchFailed($response->status(), $response->json('error'));
+            }
+
+            $data = $response->json('data');
+
+            if (! is_array($data)) {
+                throw TemplateSyncException::malformedPage('the response has no data array');
+            }
+
+            array_push($templates, ...$data);
+
+            // paging.next already carries the query and the cursor
+            $url = $response->json('paging.next');
+            $query = [];
         }
 
-        $response = $this->http()->get($this->getTemplatesEndpoint(), $params);
-
-        return $response->json('data', []);
+        return $templates;
     }
 
     /**
      * Get a specific template.
+     *
+     * @throws TemplateSyncException
      */
     public function getTemplate(string $templateName): array
     {

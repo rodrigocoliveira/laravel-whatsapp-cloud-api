@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Multek\LaravelWhatsAppCloud\Client;
 
+use Multek\LaravelWhatsAppCloud\Exceptions\TemplateSyncException;
+
 interface WhatsAppClientInterface
 {
     /**
@@ -179,6 +181,8 @@ interface WhatsAppClientInterface
      * Get templates for the business account.
      *
      * @return array<int, array<string, mixed>>
+     *
+     * @throws TemplateSyncException
      */
     public function getTemplates(?string $status = null): array;
 
@@ -186,6 +190,8 @@ interface WhatsAppClientInterface
      * Get a specific template.
      *
      * @return array<string, mixed>
+     *
+     * @throws TemplateSyncException
      */
     public function getTemplate(string $templateName): array;
 

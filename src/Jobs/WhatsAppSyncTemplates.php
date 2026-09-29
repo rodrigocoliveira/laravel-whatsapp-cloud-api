@@ -34,13 +34,14 @@ class WhatsAppSyncTemplates implements ShouldQueue
         $phone = $this->phone;
         $client = new WhatsAppClient($phone);
 
+        // Throws on any failed page, so nothing below runs on a partial list
         $templates = $client->getTemplates();
 
         foreach ($templates as $templateData) {
             $this->syncTemplate($phone, $templateData);
         }
 
-        // Mark templates not in the response as potentially deleted/disabled
+        // The list is complete here: anything missing from it is gone on Meta's side
         $activeTemplateIds = collect($templates)->pluck('id')->toArray();
 
         WhatsAppTemplate::where('whatsapp_phone_id', $phone->id)
@@ -64,6 +65,7 @@ class WhatsAppSyncTemplates implements ShouldQueue
             [
                 'template_id' => $templateData['id'],
                 'category' => $templateData['category'],
+                'parameter_format' => $templateData['parameter_format'] ?? null,
                 'status' => $templateData['status'],
                 'components' => $templateData['components'] ?? [],
                 'rejection_reason' => $templateData['rejected_reason'] ?? null,

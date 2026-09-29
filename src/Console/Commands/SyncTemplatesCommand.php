@@ -7,6 +7,7 @@ namespace Multek\LaravelWhatsAppCloud\Console\Commands;
 use Illuminate\Console\Command;
 use Multek\LaravelWhatsAppCloud\Jobs\WhatsAppSyncTemplates;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppPhone;
+use Throwable;
 
 class SyncTemplatesCommand extends Command
 {
@@ -41,26 +42,43 @@ class SyncTemplatesCommand extends Command
         $this->info('Syncing templates for '.count($phones).' phone(s)...');
         $this->newLine();
 
+        $failed = 0;
+
         foreach ($phones as $phone) {
             if ($useQueue) {
                 WhatsAppSyncTemplates::dispatch($phone);
                 $this->line("  <comment>[{$phone->key}]</comment> Queued for sync");
-            } else {
-                $this->syncPhone($phone);
+            } elseif (! $this->syncPhone($phone)) {
+                $failed++;
             }
         }
 
         $this->newLine();
+
+        if ($failed > 0) {
+            $this->error("Template sync failed for {$failed} of ".count($phones).' phone(s).');
+
+            return 1; // Command::FAILURE
+        }
+
         $this->info('Template sync '.($useQueue ? 'queued' : 'completed').' successfully!');
 
         return self::SUCCESS;
     }
 
-    protected function syncPhone(WhatsAppPhone $phone): void
+    protected function syncPhone(WhatsAppPhone $phone): bool
     {
-        $this->components->task("Syncing [{$phone->key}] ({$phone->phone_number})", function () use ($phone) {
-            $job = new WhatsAppSyncTemplates($phone);
-            $job->handle();
-        });
+        try {
+            $this->components->task("Syncing [{$phone->key}] ({$phone->phone_number})", function () use ($phone) {
+                $job = new WhatsAppSyncTemplates($phone);
+                $job->handle();
+            });
+
+            return true;
+        } catch (Throwable $e) {
+            $this->components->error("[{$phone->key}] ({$phone->phone_number}): {$e->getMessage()}");
+
+            return false;
+        }
     }
 }
