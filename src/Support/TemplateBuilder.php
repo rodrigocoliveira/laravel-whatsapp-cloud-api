@@ -10,25 +10,19 @@ use Multek\LaravelWhatsAppCloud\Models\WhatsAppConversation;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppMessage;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppPhone;
 
+/**
+ * @deprecated Use WhatsApp::phone($key)->to($number)->template($name) instead; this class will be removed in the next major.
+ */
 class TemplateBuilder
 {
     protected string $templateName;
 
     protected string $language = 'pt_BR';
 
-    /** @var array<int, array<string, mixed>> */
-    protected array $components = [];
+    protected TemplateComponents $template;
 
-    protected ?string $headerType = null;
-
-    /** @var array<string, mixed>|null */
-    protected ?array $headerValue = null;
-
-    /** @var array<int, string> */
-    protected array $bodyParameters = [];
-
-    /** @var array<int, array<string, mixed>> */
-    protected array $buttonParameters = [];
+    /** @var array<int|string, string> */
+    protected array $bodyValues = [];
 
     protected ?WhatsAppConversation $conversation = null;
 
@@ -36,7 +30,9 @@ class TemplateBuilder
         protected WhatsAppPhone $phone,
         protected WhatsAppClientInterface $client,
         protected string $to,
-    ) {}
+    ) {
+        $this->template = new TemplateComponents;
+    }
 
     /**
      * Address the template to an existing conversation's contact and link it to that conversation.
@@ -74,8 +70,7 @@ class TemplateBuilder
      */
     public function headerText(string $text): self
     {
-        $this->headerType = 'text';
-        $this->headerValue = ['type' => 'text', 'text' => $text];
+        $this->template->headerText($text);
 
         return $this;
     }
@@ -85,8 +80,7 @@ class TemplateBuilder
      */
     public function headerImage(string $url): self
     {
-        $this->headerType = 'image';
-        $this->headerValue = ['type' => 'image', 'image' => ['link' => $url]];
+        $this->template->headerMedia('image', $url);
 
         return $this;
     }
@@ -96,8 +90,7 @@ class TemplateBuilder
      */
     public function headerVideo(string $url): self
     {
-        $this->headerType = 'video';
-        $this->headerValue = ['type' => 'video', 'video' => ['link' => $url]];
+        $this->template->headerMedia('video', $url);
 
         return $this;
     }
@@ -107,12 +100,7 @@ class TemplateBuilder
      */
     public function headerDocument(string $url, ?string $filename = null): self
     {
-        $this->headerType = 'document';
-        $documentPayload = ['link' => $url];
-        if ($filename) {
-            $documentPayload['filename'] = $filename;
-        }
-        $this->headerValue = ['type' => 'document', 'document' => $documentPayload];
+        $this->template->headerMedia('document', $url, $filename);
 
         return $this;
     }
@@ -120,11 +108,12 @@ class TemplateBuilder
     /**
      * Set body parameters.
      *
-     * @param  array<int, string>  $parameters
+     * @param  array<int|string, string>  $parameters
      */
     public function bodyParameters(array $parameters): self
     {
-        $this->bodyParameters = $parameters;
+        $this->bodyValues = $parameters;
+        $this->template->body($parameters);
 
         return $this;
     }
@@ -134,9 +123,7 @@ class TemplateBuilder
      */
     public function addBodyParameter(string $value): self
     {
-        $this->bodyParameters[] = $value;
-
-        return $this;
+        return $this->bodyParameters([...$this->bodyValues, $value]);
     }
 
     /**
@@ -147,12 +134,7 @@ class TemplateBuilder
     public function buttonParameters(array $parameters): self
     {
         foreach ($parameters as $index => $value) {
-            $this->buttonParameters[] = [
-                'type' => 'button',
-                'sub_type' => 'url',
-                'index' => $index,
-                'parameters' => [['type' => 'text', 'text' => $value]],
-            ];
+            $this->template->urlButton((int) $index, (string) $value);
         }
 
         return $this;
@@ -163,50 +145,9 @@ class TemplateBuilder
      */
     public function addQuickReplyButton(int $index, string $payload): self
     {
-        $this->buttonParameters[] = [
-            'type' => 'button',
-            'sub_type' => 'quick_reply',
-            'index' => $index,
-            'parameters' => [['type' => 'payload', 'payload' => $payload]],
-        ];
+        $this->template->quickReplyButton($index, $payload);
 
         return $this;
-    }
-
-    /**
-     * Build the components array for the API.
-     *
-     * @return array<int, array<string, mixed>>
-     */
-    protected function buildComponents(): array
-    {
-        $components = [];
-
-        // Header component
-        if ($this->headerValue !== null) {
-            $components[] = [
-                'type' => 'header',
-                'parameters' => [$this->headerValue],
-            ];
-        }
-
-        // Body component
-        if (! empty($this->bodyParameters)) {
-            $components[] = [
-                'type' => 'body',
-                'parameters' => array_map(
-                    fn ($param) => ['type' => 'text', 'text' => $param],
-                    $this->bodyParameters
-                ),
-            ];
-        }
-
-        // Button components
-        foreach ($this->buttonParameters as $button) {
-            $components[] = $button;
-        }
-
-        return $components;
     }
 
     /**
@@ -214,7 +155,7 @@ class TemplateBuilder
      */
     public function send(): WhatsAppMessage
     {
-        $components = $this->buildComponents();
+        $components = $this->template->toComponents();
 
         $result = $this->client->sendTemplate(
             $this->to,
@@ -246,11 +187,7 @@ class TemplateBuilder
             'delivery_status' => WhatsAppMessage::DELIVERY_STATUS_SENT,
             'sent_at' => now(),
             'template_name' => $this->templateName,
-            'template_parameters' => [
-                'header' => $this->headerValue,
-                'body' => $this->bodyParameters,
-                'buttons' => $this->buttonParameters,
-            ],
+            'template_parameters' => $this->template->toRecord(),
         ]);
 
         event(new MessageSent($message));
