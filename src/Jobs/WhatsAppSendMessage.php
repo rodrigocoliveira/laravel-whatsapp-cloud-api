@@ -16,6 +16,7 @@ use Multek\LaravelWhatsAppCloud\Events\MessageFailed;
 use Multek\LaravelWhatsAppCloud\Events\MessageSent;
 use Multek\LaravelWhatsAppCloud\Exceptions\MessageSendException;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppMessage;
+use Multek\LaravelWhatsAppCloud\Support\TemplateComponents;
 
 class WhatsAppSendMessage implements ShouldQueue
 {
@@ -76,11 +77,14 @@ class WhatsAppSendMessage implements ShouldQueue
     }
 
     /**
-     * A message queued with a local file carries its copy on disk but no Meta media id yet.
+     * A message queued with a local file carries its copy on disk but no Meta media id yet;
+     * for a template, that file is its header.
      */
     protected function uploadStoredMedia(WhatsAppClient $client, WhatsAppMessage $message): void
     {
-        if (! $message->isMedia() || $message->media_id !== null || ! $message->local_media_path || ! $message->local_media_disk) {
+        $isTemplate = $message->type === 'template';
+
+        if ((! $message->isMedia() && ! $isTemplate) || $message->media_id !== null || ! $message->local_media_path || ! $message->local_media_disk) {
             return;
         }
 
@@ -92,9 +96,22 @@ class WhatsAppSendMessage implements ShouldQueue
 
         $mediaId = $result['id'] ?? throw MessageSendException::mediaUploadFailed('no media id returned');
 
+        if (! $isTemplate) {
+            $message->update([
+                'media_id' => $mediaId,
+                'content' => ['id' => $mediaId] + ($message->content ?? []),
+            ]);
+
+            return;
+        }
+
+        $template = (new TemplateComponents)->raw($message->content['components'] ?? []);
+        $template->resolveHeaderMedia($mediaId);
+
         $message->update([
             'media_id' => $mediaId,
-            'content' => ['id' => $mediaId] + ($message->content ?? []),
+            'content' => ['components' => $template->toComponents()] + ($message->content ?? []),
+            'template_parameters' => $template->toRecord(),
         ]);
     }
 
