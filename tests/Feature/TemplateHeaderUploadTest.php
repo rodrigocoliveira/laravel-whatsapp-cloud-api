@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Http\Client\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
@@ -103,6 +104,9 @@ it('does not upload again when a queued template is retried after the upload', f
     $message = ($this->builder)()
         ->headerImage(UploadedFile::fake()->image('banner.jpg'))
         ->queue();
+
+    $raw = DB::table('whatsapp_messages')->where('id', $message->id)->value('template_parameters');
+    expect($raw)->toContain('"image":{}');
 
     (new WhatsAppSendMessage($message))->handle();
 

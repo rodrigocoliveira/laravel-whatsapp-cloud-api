@@ -124,3 +124,9 @@ it('produces nothing when no parameters were given', function () {
     expect((new TemplateComponents)->toComponents())->toBe([])
         ->and((new TemplateComponents)->toRecord())->toBe(['header' => null, 'body' => [], 'buttons' => []]);
 });
+
+it('serializes a pending file header as a JSON object, not an array', function () {
+    $header = (new TemplateComponents)->headerMedia('image', UploadedFile::fake()->image('a.jpg'))->toRecord()['header'];
+
+    expect(json_encode($header))->toBe('{"type":"image","image":{}}');
+});

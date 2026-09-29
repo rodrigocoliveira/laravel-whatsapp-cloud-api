@@ -64,7 +64,8 @@ class TemplateComponents
             }
         }
 
-        $this->header = ['type' => $type, $type => $media];
+        // A pending file has no id yet; an empty media object must serialize as `{}`, not `[]`.
+        $this->header = ['type' => $type, $type => $media === [] ? new \stdClass : $media];
 
         return $this;
     }
@@ -172,7 +173,7 @@ class TemplateComponents
     {
         $type = $this->header['type'] ?? null;
 
-        return in_array($type, self::HEADER_MEDIA_TYPES, true) ? ($this->header[$type]['id'] ?? null) : null;
+        return in_array($type, self::HEADER_MEDIA_TYPES, true) ? ((array) $this->header[$type])['id'] ?? null : null;
     }
 
     /**
@@ -186,7 +187,7 @@ class TemplateComponents
             return;
         }
 
-        $this->header[$type] = ['id' => $mediaId] + ($this->header[$type] ?? []);
+        $this->header[$type] = ['id' => $mediaId] + (array) ($this->header[$type] ?? []);
         $this->headerFile = null;
     }
 

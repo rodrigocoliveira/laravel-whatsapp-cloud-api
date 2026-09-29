@@ -281,7 +281,9 @@ A sent template's `template_parameters` column records what was sent, in Meta's 
 `header` is Meta's header parameter (e.g. `{type: 'document', document: {id, filename}}`),
 `body` is the list of body parameters and `buttons` the list of button components. Rows
 recorded before this version keep the old shape (`header` a string, `body` a list of strings,
-`buttons` as `[index => text]`), so readers of that column should accept both.
+`buttons` as `[index => text]`), so readers of that column should accept both. A message queued with a header file has no `id` in its
+header until the send job uploads the file (`{type: 'image', image: {}}` or
+`{type: 'document', document: {filename}}` while pending).
 
 Every outbound message is linked to a `WhatsAppConversation`, resolved from the sending phone and
 the normalized recipient (created if none exists, so inbound and outbound land on the same thread),
