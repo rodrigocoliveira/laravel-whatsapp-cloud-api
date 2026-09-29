@@ -54,17 +54,7 @@ class MessageBuilder
 
     protected ?string $templateLanguage = 'pt_BR';
 
-    protected ?string $headerType = null;
-
-    protected ?string $headerValue = null;
-
-    protected ?string $headerFilename = null;
-
-    /** @var array<int, string> */
-    protected array $bodyParameters = [];
-
-    /** @var array<int, string> */
-    protected array $buttonParameters = [];
+    protected TemplateComponents $template;
 
     // Interactive Buttons
     protected ?string $interactiveBody = null;
@@ -119,7 +109,9 @@ class MessageBuilder
     public function __construct(
         protected WhatsAppPhone $phone,
         protected WhatsAppClientInterface $client,
-    ) {}
+    ) {
+        $this->template = new TemplateComponents;
+    }
 
     public function to(string $phone): self
     {
@@ -252,59 +244,92 @@ class MessageBuilder
         return $this;
     }
 
-    public function headerImage(string $urlOrMediaId): self
+    // Template header media: a file is uploaded to Meta, a digits-only string is a media id,
+    // any other string is a link.
+    public function headerImage(SplFileInfo|string $source): self
     {
-        $this->headerType = 'image';
-        $this->headerValue = $urlOrMediaId;
-        $this->interactiveHeader = [
-            'type' => 'image',
-            'image' => $urlOrMediaId,
-        ];
+        $this->template->headerMedia('image', $source);
+        $this->interactiveHeader = is_string($source) ? ['type' => 'image', 'image' => $source] : null;
 
         return $this;
     }
 
-    public function headerVideo(string $url): self
+    public function headerVideo(SplFileInfo|string $source): self
     {
-        $this->headerType = 'video';
-        $this->headerValue = $url;
+        $this->template->headerMedia('video', $source);
 
         return $this;
     }
 
-    public function headerDocument(string $url, ?string $filename = null): self
+    public function headerDocument(SplFileInfo|string $source, ?string $filename = null): self
     {
-        $this->headerType = 'document';
-        $this->headerValue = $url;
-        $this->headerFilename = $filename;
+        $this->template->headerMedia('document', $source, $filename);
 
         return $this;
     }
 
-    public function headerText(string $text): self
+    public function headerText(string $text, ?string $name = null): self
     {
-        $this->headerType = 'text';
-        $this->headerValue = $text;
+        $this->template->headerText($text, $name);
 
         return $this;
     }
 
     /**
-     * @param  array<int, string>  $params
+     * A list sends positional parameters; string keys send named ones (parameter_name).
+     *
+     * @param  array<int|string, string|int|float>  $params
      */
     public function bodyParameters(array $params): self
     {
-        $this->bodyParameters = $params;
+        $this->template->body($params);
 
         return $this;
     }
 
     /**
+     * URL button suffixes keyed by button index: [1 => 'PED-1'] targets the second button.
+     *
      * @param  array<int, string>  $params
      */
     public function buttonParameters(array $params): self
     {
-        $this->buttonParameters = $params;
+        foreach ($params as $index => $suffix) {
+            $this->template->urlButton((int) $index, (string) $suffix);
+        }
+
+        return $this;
+    }
+
+    public function urlButton(int $index, string $suffix): self
+    {
+        $this->template->urlButton($index, $suffix);
+
+        return $this;
+    }
+
+    public function copyCodeButton(int $index, string $code): self
+    {
+        $this->template->copyCodeButton($index, $code);
+
+        return $this;
+    }
+
+    public function quickReplyButton(int $index, string $payload): self
+    {
+        $this->template->quickReplyButton($index, $payload);
+
+        return $this;
+    }
+
+    /**
+     * Template components exactly as Meta documents them, for anything the helpers don't cover.
+     *
+     * @param  array<int, array<string, mixed>>  $metaComponents
+     */
+    public function components(array $metaComponents): self
+    {
+        $this->template->raw($metaComponents);
 
         return $this;
     }
@@ -464,6 +489,7 @@ class MessageBuilder
     public function send(): WhatsAppMessage
     {
         $this->ensureRecipient();
+        $this->ensureHeaderFileIsTemplate();
         $this->uploadMediaFile();
 
         $result = $this->executeApiCall();
@@ -478,6 +504,7 @@ class MessageBuilder
     public function queue(): WhatsAppMessage
     {
         $this->ensureRecipient();
+        $this->ensureHeaderFileIsTemplate();
         $this->storeMediaFile();
 
         $message = $this->createPendingMessage();
@@ -589,49 +616,7 @@ class MessageBuilder
      */
     protected function buildTemplateComponents(): array
     {
-        $components = [];
-
-        if ($this->headerType !== null && $this->headerValue !== null) {
-            $headerComponent = ['type' => 'header', 'parameters' => []];
-
-            if ($this->headerType === 'text') {
-                $headerComponent['parameters'][] = ['type' => 'text', 'text' => $this->headerValue];
-            } else {
-                $media = ['link' => $this->headerValue];
-
-                if ($this->headerType === 'document' && $this->headerFilename !== null) {
-                    $media['filename'] = $this->headerFilename;
-                }
-
-                $headerComponent['parameters'][] = [
-                    'type' => $this->headerType,
-                    $this->headerType => $media,
-                ];
-            }
-
-            $components[] = $headerComponent;
-        }
-
-        if (! empty($this->bodyParameters)) {
-            $bodyComponent = ['type' => 'body', 'parameters' => []];
-            foreach ($this->bodyParameters as $param) {
-                $bodyComponent['parameters'][] = ['type' => 'text', 'text' => $param];
-            }
-            $components[] = $bodyComponent;
-        }
-
-        if (! empty($this->buttonParameters)) {
-            foreach ($this->buttonParameters as $index => $param) {
-                $components[] = [
-                    'type' => 'button',
-                    'sub_type' => 'url',
-                    'index' => $index,
-                    'parameters' => [['type' => 'text', 'text' => $param]],
-                ];
-            }
-        }
-
-        return $components;
+        return $this->template->toComponents();
     }
 
     /**
@@ -657,7 +642,7 @@ class MessageBuilder
             'template_name' => $this->templateName,
             'template_parameters' => $this->buildTemplateParametersForRecord(),
             'metadata' => $this->metadata ?: null,
-        ] + $this->mediaAttributes);
+        ] + $this->mediaAttributes + $this->templateMediaAttributes());
     }
 
     protected function createPendingMessage(): WhatsAppMessage
@@ -677,7 +662,7 @@ class MessageBuilder
             'template_name' => $this->templateName,
             'template_parameters' => $this->buildTemplateParametersForRecord(),
             'metadata' => $this->metadata ?: null,
-        ] + $this->mediaAttributes);
+        ] + $this->mediaAttributes + $this->templateMediaAttributes());
     }
 
     protected function ensureRecipient(): string
@@ -846,14 +831,25 @@ class MessageBuilder
      */
     protected function buildTemplateParametersForRecord(): ?array
     {
-        if ($this->messageType !== 'template') {
-            return null;
-        }
+        return $this->messageType === 'template' ? $this->template->toRecord() : null;
+    }
 
-        return [
-            'header' => $this->headerValue,
-            'body' => $this->bodyParameters,
-            'buttons' => $this->buttonParameters,
-        ];
+    /**
+     * A template header sent by media id records it like any outbound media.
+     *
+     * @return array<string, string>
+     */
+    protected function templateMediaAttributes(): array
+    {
+        $mediaId = $this->messageType === 'template' ? $this->template->headerMediaId() : null;
+
+        return $mediaId === null ? [] : ['media_id' => $mediaId];
+    }
+
+    protected function ensureHeaderFileIsTemplate(): void
+    {
+        if ($this->messageType !== 'template' && $this->template->headerFile() !== null) {
+            throw new \InvalidArgumentException('A header file can only be sent with a template; pass a URL or media id for an interactive header.');
+        }
     }
 }
