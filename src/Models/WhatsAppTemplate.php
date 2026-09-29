@@ -15,6 +15,7 @@ use Illuminate\Support\Carbon;
  * @property string $name
  * @property string $language
  * @property string $category
+ * @property string|null $parameter_format
  * @property string $status
  * @property array $components
  * @property string|null $rejection_reason
@@ -41,12 +42,17 @@ class WhatsAppTemplate extends Model
 
     public const STATUS_DISABLED = 'DISABLED';
 
+    public const PARAMETER_FORMAT_NAMED = 'NAMED';
+
+    public const PARAMETER_FORMAT_POSITIONAL = 'POSITIONAL';
+
     protected $fillable = [
         'whatsapp_phone_id',
         'template_id',
         'name',
         'language',
         'category',
+        'parameter_format',
         'status',
         'components',
         'rejection_reason',
@@ -84,6 +90,11 @@ class WhatsAppTemplate extends Model
     public function isDisabled(): bool
     {
         return $this->status === self::STATUS_DISABLED;
+    }
+
+    public function usesNamedParameters(): bool
+    {
+        return $this->parameter_format === self::PARAMETER_FORMAT_NAMED;
     }
 
     public function getHeaderComponent(): ?array

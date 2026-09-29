@@ -789,7 +789,8 @@ php artisan whatsapp:phone:add support --phone-id=123 --phone-number=+5511999999
 php artisan whatsapp:phone:update support --token
 php artisan whatsapp:phone:list
 
-# Sync message templates from Meta
+# Sync message templates from Meta (follows every page; if Meta returns an error,
+# nothing is changed and the job retries, so templates are never disabled by mistake)
 php artisan whatsapp:sync-templates
 
 # Process stale/stuck batches (runs automatically every 5 min)

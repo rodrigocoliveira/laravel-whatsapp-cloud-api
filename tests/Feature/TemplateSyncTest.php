@@ -7,7 +7,9 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Multek\LaravelWhatsAppCloud\Client\WhatsAppClient;
 use Multek\LaravelWhatsAppCloud\Exceptions\TemplateSyncException;
+use Multek\LaravelWhatsAppCloud\Jobs\WhatsAppSyncTemplates;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppPhone;
+use Multek\LaravelWhatsAppCloud\Models\WhatsAppTemplate;
 
 beforeEach(function () {
     $this->phone = WhatsAppPhone::create([
@@ -105,4 +107,55 @@ it('treats a page without data as no templates', function () {
     fakeTemplatePages(['first' => Http::response([])]);
 
     expect((new WhatsAppClient($this->phone))->getTemplates())->toBe([]);
+});
+
+it('syncs templates from every page and disables only the ones Meta no longer has', function () {
+    WhatsAppTemplate::create([
+        'whatsapp_phone_id' => $this->phone->id, 'template_id' => '99', 'name' => 'gone',
+        'language' => 'pt_BR', 'category' => 'UTILITY', 'status' => 'APPROVED', 'components' => [],
+    ]);
+
+    fakeTemplatePages([
+        'first' => Http::response(['data' => [metaTemplate('1', 'welcome')], 'paging' => ['next' => nextPage('p2')]]),
+        'p2' => Http::response(['data' => [metaTemplate('2', 'order_update', 'NAMED')]]),
+    ]);
+
+    (new WhatsAppSyncTemplates($this->phone))->handle();
+
+    expect(WhatsAppTemplate::where('name', 'order_update')->value('status'))->toBe('APPROVED')
+        ->and(WhatsAppTemplate::where('name', 'welcome')->value('status'))->toBe('APPROVED')
+        ->and(WhatsAppTemplate::where('name', 'gone')->value('status'))->toBe(WhatsAppTemplate::STATUS_DISABLED);
+});
+
+it('stores the parameter format Meta reports', function () {
+    fakeTemplatePages(['first' => Http::response(['data' => [
+        metaTemplate('1', 'welcome'),
+        metaTemplate('2', 'order_update', 'NAMED'),
+    ]])]);
+
+    (new WhatsAppSyncTemplates($this->phone))->handle();
+
+    $named = WhatsAppTemplate::where('name', 'order_update')->first();
+    $positional = WhatsAppTemplate::where('name', 'welcome')->first();
+
+    expect($named->parameter_format)->toBe(WhatsAppTemplate::PARAMETER_FORMAT_NAMED)
+        ->and($named->usesNamedParameters())->toBeTrue()
+        ->and($positional->usesNamedParameters())->toBeFalse();
+});
+
+it('changes nothing when a page fails', function () {
+    WhatsAppTemplate::create([
+        'whatsapp_phone_id' => $this->phone->id, 'template_id' => '2', 'name' => 'order_update',
+        'language' => 'pt_BR', 'category' => 'UTILITY', 'status' => 'APPROVED', 'components' => [],
+    ]);
+
+    fakeTemplatePages([
+        'first' => Http::response(['data' => [metaTemplate('1', 'welcome')], 'paging' => ['next' => nextPage('p2')]]),
+        'p2' => Http::response(['error' => ['message' => 'boom']], 500),
+    ]);
+
+    expect(fn () => (new WhatsAppSyncTemplates($this->phone))->handle())->toThrow(TemplateSyncException::class);
+
+    expect(WhatsAppTemplate::count())->toBe(1)
+        ->and(WhatsAppTemplate::where('name', 'order_update')->value('status'))->toBe('APPROVED');
 });
