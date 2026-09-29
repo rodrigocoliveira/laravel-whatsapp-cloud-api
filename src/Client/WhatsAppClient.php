@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Multek\LaravelWhatsAppCloud\Exceptions\MediaDownloadException;
 use Multek\LaravelWhatsAppCloud\Exceptions\MessageSendException;
+use Multek\LaravelWhatsAppCloud\Exceptions\TemplateSyncException;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppPhone;
 use Multek\LaravelWhatsAppCloud\Support\PhoneNumberHelper;
 
@@ -506,22 +507,48 @@ class WhatsAppClient implements WhatsAppClientInterface
     }
 
     /**
-     * Get templates for the business account.
+     * Get every template for the business account, following Meta's pagination.
+     *
+     * @throws TemplateSyncException when any page fails; a partial list is never returned
      */
     public function getTemplates(?string $status = null): array
     {
-        $params = [];
-        if ($status) {
-            $params['status'] = $status;
+        $query = array_filter([
+            'fields' => 'id,name,language,status,category,components,parameter_format,rejected_reason',
+            'limit' => 100,
+            'status' => $status,
+        ]);
+
+        $templates = [];
+        $url = $this->getTemplatesEndpoint();
+        $visited = [];
+
+        while ($url !== null && ! isset($visited[$url])) {
+            $visited[$url] = true;
+
+            // Only pass query array if not empty; paging.next URL already has query params
+            $response = $query
+                ? $this->http()->get($url, $query)
+                : $this->http()->get($url);
+
+            if (! $response->successful()) {
+                throw TemplateSyncException::fetchFailed($response->status(), $response->json('error'));
+            }
+
+            array_push($templates, ...($response->json('data') ?? []));
+
+            // paging.next already carries the query and the cursor
+            $url = $response->json('paging.next');
+            $query = [];
         }
 
-        $response = $this->http()->get($this->getTemplatesEndpoint(), $params);
-
-        return $response->json('data', []);
+        return $templates;
     }
 
     /**
      * Get a specific template.
+     *
+     * @throws TemplateSyncException
      */
     public function getTemplate(string $templateName): array
     {
