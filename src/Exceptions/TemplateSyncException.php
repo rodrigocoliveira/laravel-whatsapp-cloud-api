@@ -24,4 +24,12 @@ class TemplateSyncException extends WhatsAppException
             $error
         );
     }
+
+    /**
+     * A successful response whose body cannot be trusted as a template page.
+     */
+    public static function malformedPage(string $reason): self
+    {
+        return new self("Received a malformed message template page from WhatsApp: {$reason}");
+    }
 }

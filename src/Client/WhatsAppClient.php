@@ -509,7 +509,11 @@ class WhatsAppClient implements WhatsAppClientInterface
     /**
      * Get every template for the business account, following Meta's pagination.
      *
-     * @throws TemplateSyncException when any page fails; a partial list is never returned
+     * A page with `data: []` means zero templates. A failed page, a successful page
+     * without a `data` array, or a repeated `paging.next` URL throws instead, so a
+     * partial or unreadable result is never mistaken for a complete list.
+     *
+     * @throws TemplateSyncException when any page fails or is malformed; a partial list is never returned
      */
     public function getTemplates(?string $status = null): array
     {
@@ -523,7 +527,11 @@ class WhatsAppClient implements WhatsAppClientInterface
         $url = $this->getTemplatesEndpoint();
         $visited = [];
 
-        while ($url !== null && ! isset($visited[$url])) {
+        while ($url !== null) {
+            if (isset($visited[$url])) {
+                throw TemplateSyncException::malformedPage("paging.next repeated an already visited page ({$url})");
+            }
+
             $visited[$url] = true;
 
             // Only pass query array if not empty; paging.next URL already has query params
@@ -535,7 +543,13 @@ class WhatsAppClient implements WhatsAppClientInterface
                 throw TemplateSyncException::fetchFailed($response->status(), $response->json('error'));
             }
 
-            array_push($templates, ...($response->json('data') ?? []));
+            $data = $response->json('data');
+
+            if (! is_array($data)) {
+                throw TemplateSyncException::malformedPage('the response has no data array');
+            }
+
+            array_push($templates, ...$data);
 
             // paging.next already carries the query and the cursor
             $url = $response->json('paging.next');

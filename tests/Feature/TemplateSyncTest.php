@@ -91,22 +91,43 @@ it('throws when any page fails instead of returning a partial list', function ()
     (new WhatsAppClient($this->phone))->getTemplates();
 })->throws(TemplateSyncException::class, 'HTTP 500');
 
-it('stops when Meta repeats the same next page', function () {
+it('throws when Meta repeats the same next page', function () {
     fakeTemplatePages([
         'first' => Http::response(['data' => [metaTemplate('1', 'welcome')], 'paging' => ['next' => nextPage('p2')]]),
         'p2' => Http::response(['data' => [metaTemplate('2', 'order_update')], 'paging' => ['next' => nextPage('p2')]]),
     ]);
 
-    $templates = (new WhatsAppClient($this->phone))->getTemplates();
+    try {
+        (new WhatsAppClient($this->phone))->getTemplates();
+        $this->fail('Expected TemplateSyncException');
+    } catch (TemplateSyncException $e) {
+        expect($e->getMessage())->toContain('repeated');
+    }
 
-    expect($templates)->toHaveCount(2);
     Http::assertSentCount(2);
 });
 
-it('treats a page without data as no templates', function () {
-    fakeTemplatePages(['first' => Http::response([])]);
+it('treats an empty data array as no templates', function () {
+    fakeTemplatePages(['first' => Http::response(['data' => []])]);
 
     expect((new WhatsAppClient($this->phone))->getTemplates())->toBe([]);
+});
+
+it('throws when a successful page has no data array', function () {
+    fakeTemplatePages(['first' => Http::response([])]);
+
+    (new WhatsAppClient($this->phone))->getTemplates();
+})->throws(TemplateSyncException::class, 'malformed');
+
+it('does not disable local templates when Meta returns a page without data', function () {
+    WhatsAppTemplate::create([
+        'whatsapp_phone_id' => $this->phone->id, 'template_id' => '2', 'name' => 'order_update',
+        'language' => 'pt_BR', 'category' => 'UTILITY', 'status' => 'APPROVED', 'components' => [],
+    ]);
+    fakeTemplatePages(['first' => Http::response([])]);
+
+    expect(fn () => (new WhatsAppSyncTemplates($this->phone))->handle())->toThrow(TemplateSyncException::class);
+    expect(WhatsAppTemplate::where('name', 'order_update')->value('status'))->toBe('APPROVED');
 });
 
 it('syncs templates from every page and disables only the ones Meta no longer has', function () {
@@ -158,4 +179,35 @@ it('changes nothing when a page fails', function () {
 
     expect(WhatsAppTemplate::count())->toBe(1)
         ->and(WhatsAppTemplate::where('name', 'order_update')->value('status'))->toBe('APPROVED');
+});
+
+it('keeps syncing the other phones when one phone fails and exits with failure', function () {
+    $second = WhatsAppPhone::create([
+        'key' => 'second',
+        'phone_id' => 'second_phone_id',
+        'phone_number' => '+15557654321',
+        'business_account_id' => 'second_waba',
+        'is_active' => true,
+    ]);
+
+    $this->phone->update(['business_account_id' => 'first_waba']);
+
+    Http::fake(function (Request $request) {
+        if (str_contains($request->url(), 'first_waba')) {
+            return Http::response(['error' => ['code' => 190, 'message' => 'bad token']], 500);
+        }
+
+        return Http::response(['data' => [metaTemplate('1', 'welcome')]]);
+    });
+
+    $this->artisan('whatsapp:sync-templates')->assertFailed();
+
+    expect(WhatsAppTemplate::where('whatsapp_phone_id', $second->id)->where('name', 'welcome')->exists())->toBeTrue()
+        ->and(WhatsAppTemplate::where('whatsapp_phone_id', $this->phone->id)->count())->toBe(0);
+});
+
+it('exits with success when every phone syncs', function () {
+    fakeTemplatePages(['first' => Http::response(['data' => [metaTemplate('1', 'welcome')]])]);
+
+    $this->artisan('whatsapp:sync-templates')->assertSuccessful();
 });
