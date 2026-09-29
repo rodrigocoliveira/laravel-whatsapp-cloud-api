@@ -196,7 +196,7 @@ class MessageBuilder
         $this->mediaAttributes = [];
 
         if ($type === 'document' && $this->mediaFile !== null) {
-            $this->filename ??= $this->mediaFileName();
+            $this->filename ??= $this->localFileName($this->mediaFile);
         }
 
         return $this;
@@ -697,19 +697,26 @@ class MessageBuilder
      */
     protected function uploadMediaFile(): void
     {
-        if ($this->mediaFile === null) {
+        $file = $this->pendingFile();
+
+        if ($file === null) {
             return;
         }
 
-        $contents = (string) file_get_contents($this->mediaFile->getPathname());
-        $mimeType = $this->mediaFileMimeType();
+        $contents = (string) file_get_contents($file->getPathname());
+        $mimeType = $this->fileMimeType($file);
 
-        $result = $this->client->uploadMediaContents($contents, $mimeType, $this->mediaFileName());
+        $result = $this->client->uploadMediaContents($contents, $mimeType, $this->localFileName($file));
         $mediaId = $result['id'] ?? throw MessageSendException::mediaUploadFailed('no media id returned');
 
         $this->storeMediaFile($contents, $mimeType);
 
-        $this->mediaUrlOrId = $mediaId;
+        if ($this->messageType === 'template') {
+            $this->template->resolveHeaderMedia($mediaId);
+        } else {
+            $this->mediaUrlOrId = $mediaId;
+        }
+
         $this->mediaAttributes['media_id'] = $mediaId;
     }
 
@@ -718,37 +725,44 @@ class MessageBuilder
      */
     protected function storeMediaFile(?string $contents = null, ?string $mimeType = null): void
     {
-        if ($this->mediaFile === null || isset($this->mediaAttributes['local_media_path'])) {
+        $file = $this->pendingFile();
+
+        if ($file === null || isset($this->mediaAttributes['local_media_path'])) {
             return;
         }
 
-        $contents ??= (string) file_get_contents($this->mediaFile->getPathname());
-        $mimeType ??= $this->mediaFileMimeType();
+        $contents ??= (string) file_get_contents($file->getPathname());
+        $mimeType ??= $this->fileMimeType($file);
 
         ['disk' => $disk, 'path' => $path] = app(MediaService::class)->store($contents, $mimeType);
 
         $this->mediaAttributes += [
             'media_mime_type' => $mimeType,
-            'media_size' => (int) $this->mediaFile->getSize(),
+            'media_size' => (int) $file->getSize(),
             'media_status' => WhatsAppMessage::MEDIA_STATUS_DOWNLOADED,
             'local_media_disk' => $disk,
             'local_media_path' => $path,
         ];
     }
 
-    protected function mediaFileMimeType(): string
+    protected function fileMimeType(SplFileInfo $file): string
     {
-        $file = $this->mediaFile;
         $mimeType = $file instanceof SymfonyFile ? $file->getMimeType() : mime_content_type($file->getPathname());
 
         return $mimeType ?: 'application/octet-stream';
     }
 
-    protected function mediaFileName(): string
+    protected function localFileName(SplFileInfo $file): string
     {
-        return $this->mediaFile instanceof UploadedFile
-            ? $this->mediaFile->getClientOriginalName()
-            : $this->mediaFile->getFilename();
+        return $file instanceof UploadedFile ? $file->getClientOriginalName() : $file->getFilename();
+    }
+
+    /**
+     * The local file this message sends: the media file, or a template's header file.
+     */
+    protected function pendingFile(): ?SplFileInfo
+    {
+        return $this->messageType === 'template' ? $this->template->headerFile() : $this->mediaFile;
     }
 
     protected function resolveMessageTypeForRecord(): string
