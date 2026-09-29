@@ -221,6 +221,20 @@ WhatsApp::phone('support')
     ->send();
 ```
 
+### Sending Templates
+
+```php
+WhatsApp::phone('support')
+    ->to($recipient)
+    ->template('order_update')
+    ->bodyParameters(['customer_name' => 'Marina']) // list = positional, string keys = named
+    ->urlButton(1, 'PED-42')
+    ->send();
+```
+
+Template state lives in `Support/TemplateComponents` in Meta's component shape; the payload
+and `template_parameters` are both read from it.
+
 ### Handling Media in Handler
 
 ```php

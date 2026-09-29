@@ -228,6 +228,40 @@ WhatsApp::phone('support')
     ->address('Sao Paulo, Brazil')
     ->send();
 
+// Send a template. Positional parameters are a list; named ones ({{customer_name}})
+// use string keys and go out as Meta's parameter_name.
+WhatsApp::phone('support')
+    ->to('+5511999999999')
+    ->template('order_update')
+    ->language('pt_BR')
+    ->headerText('#42', name: 'order_id')        // or ->headerText('#42') for positional
+    ->bodyParameters(['customer_name' => 'Marina'])
+    ->copyCodeButton(0, 'CORBI10')                // index = the button's position in the template
+    ->urlButton(1, 'PED-42')
+    ->quickReplyButton(2, 'talk_to_human')
+    ->send();
+
+// Template media headers take a file (uploaded to Meta, sent by id, kept on the media disk
+// like any outbound media), a Meta media id (digits only) or a URL.
+WhatsApp::phone('support')
+    ->to('+5511999999999')
+    ->template('quote_ready')
+    ->headerDocument($request->file('quote'), 'Orçamento.pdf')
+    ->send();
+
+// Anything the helpers don't cover: pass components exactly as Meta documents them.
+WhatsApp::phone('support')
+    ->to('+5511999999999')
+    ->template('flash_sale')
+    ->components([
+        ['type' => 'limited_time_offer', 'parameters' => [
+            ['type' => 'limited_time_offer', 'limited_time_offer' => ['expiration_time_ms' => 1767225600000]],
+        ]],
+    ])
+    ->send();
+
+// buttonParameters([1 => 'PED-42']) still works for URL buttons: its keys are the button indexes.
+
 // Send inside an existing conversation (addresses its contact and links the message to it)
 WhatsApp::phone('support')
     ->conversation($conversation)
@@ -242,6 +276,14 @@ WhatsApp::phone('support')->removeReaction('wamid.HBgL...');
 // Reacting to a message that is not stored locally requires the recipient
 WhatsApp::phone('support')->sendReaction('wamid.HBgL...', '👍', to: '+5511999999999');
 ```
+
+A sent template's `template_parameters` column records what was sent, in Meta's shape:
+`header` is Meta's header parameter (e.g. `{type: 'document', document: {id, filename}}`),
+`body` is the list of body parameters and `buttons` the list of button components. Rows
+recorded before this version keep the old shape (`header` a string, `body` a list of strings,
+`buttons` as `[index => text]`), so readers of that column should accept both. A message queued with a header file has no `id` in its
+header until the send job uploads the file (`{type: 'image', image: {}}` or
+`{type: 'document', document: {filename}}` while pending).
 
 Every outbound message is linked to a `WhatsAppConversation`, resolved from the sending phone and
 the normalized recipient (created if none exists, so inbound and outbound land on the same thread),
