@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Multek\LaravelWhatsAppCloud\Console\Commands;
 
 use Illuminate\Console\Command;
+use Multek\LaravelWhatsAppCloud\Contracts\FlowHandlerInterface;
 use Multek\LaravelWhatsAppCloud\Contracts\MessageHandlerInterface;
 use Multek\LaravelWhatsAppCloud\Support\PhoneNumberHelper;
 
@@ -45,6 +46,16 @@ abstract class PhoneCommand extends Command
             }
 
             $attributes['handler'] = $handler;
+        }
+
+        if (($flowHandler = $this->option('flow-handler')) !== null) {
+            if (! class_exists($flowHandler) || ! is_subclass_of($flowHandler, FlowHandlerInterface::class)) {
+                $this->error("Flow handler {$flowHandler} must exist and implement ".FlowHandlerInterface::class.'.');
+
+                return null;
+            }
+
+            $attributes['flow_handler'] = $flowHandler;
         }
 
         if (($window = $this->option('batch-window')) !== null) {

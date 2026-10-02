@@ -169,11 +169,13 @@ class FlowEndpointController extends Controller
     }
 
     /**
-     * The flow's own handler, falling back to `whatsapp.flows.handler`.
+     * The flow's own handler, then the sending phone's `flow_handler`, then `whatsapp.flows.handler`.
      */
     private function handler(?WhatsAppFlowSession $session): FlowHandlerInterface
     {
-        $handlerClass = $session->flow->handler ?? config('whatsapp.flows.handler');
+        $handlerClass = $session->flow->handler
+            ?? $session?->message->phone->flow_handler
+            ?? config('whatsapp.flows.handler');
 
         if (! is_string($handlerClass) || ! class_exists($handlerClass)) {
             throw new \RuntimeException('No WhatsApp Flow handler is configured.');

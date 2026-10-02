@@ -201,6 +201,22 @@ it('answers 427 when the handler throws FlowTokenException', function () {
         ->toBe(['status' => 427, 'data' => ['error_msg' => 'Pedido cancelado']]);
 });
 
+it('uses the phone default flow handler when the flow has none', function () {
+    $this->flow->update(['handler' => null]);
+    $this->phone->update(['flow_handler' => OrderFlowHandler::class]);
+    config()->set('whatsapp.flows.handler', FallbackFlowHandler::class);
+    sendOrderFlow();
+
+    expect(exchangeOrderFlow($this->publicKey, 'DADOS')['data']['screen'])->toBe('CONFIRMAR');
+});
+
+it('prefers the flow handler over the phone default', function () {
+    $this->phone->update(['flow_handler' => FallbackFlowHandler::class]);
+    sendOrderFlow();
+
+    expect(exchangeOrderFlow($this->publicKey, 'DADOS')['data']['screen'])->toBe('CONFIRMAR');
+});
+
 it('falls back to the configured handler for tokens without a session', function () {
     config()->set('whatsapp.flows.handler', OrderFlowHandler::class);
 
@@ -310,5 +326,13 @@ class OrderFlowHandler implements FlowHandlerInterface
         $request->session()?->remember($request->data);
 
         return FlowResponse::screen('CONFIRMAR');
+    }
+}
+
+class FallbackFlowHandler implements FlowHandlerInterface
+{
+    public function handle(FlowRequest $request): FlowResponse
+    {
+        return FlowResponse::screen('FALLBACK');
     }
 }

@@ -15,6 +15,7 @@ class PhoneUpdateCommand extends PhoneCommand
                             {--business-account-id= : WhatsApp Business Account ID}
                             {--token= : New access token; pass the flag alone to be prompted}
                             {--handler= : Class implementing MessageHandlerInterface}
+                            {--flow-handler= : Default class implementing FlowHandlerInterface for flows sent from this phone}
                             {--batch-window= : Seconds to wait before processing a batch}
                             {--active : Activate the phone}
                             {--inactive : Deactivate the phone}';
