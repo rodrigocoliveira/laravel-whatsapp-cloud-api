@@ -2,7 +2,10 @@
 
 declare(strict_types=1);
 
+use Multek\LaravelWhatsAppCloud\Contracts\FlowHandlerInterface;
 use Multek\LaravelWhatsAppCloud\Contracts\MessageHandlerInterface;
+use Multek\LaravelWhatsAppCloud\DTOs\Flows\FlowRequest;
+use Multek\LaravelWhatsAppCloud\DTOs\Flows\FlowResponse;
 use Multek\LaravelWhatsAppCloud\DTOs\IncomingMessageContext;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppPhone;
 
@@ -147,6 +150,13 @@ describe('whatsapp:phone:update', function () {
         $this->artisan('whatsapp:phone:update', ['key' => 'support'])->assertFailed();
     });
 
+    it('sets the default flow handler and validates its interface', function () {
+        $this->artisan('whatsapp:phone:update', ['key' => 'support', '--flow-handler' => stdClass::class])->assertFailed();
+        $this->artisan('whatsapp:phone:update', ['key' => 'support', '--flow-handler' => PhoneCommandsTestFlowHandler::class])->assertSuccessful();
+
+        expect($this->phone->fresh()->flow_handler)->toBe(PhoneCommandsTestFlowHandler::class);
+    });
+
     it('validates the handler like add does', function () {
         $this->artisan('whatsapp:phone:update', ['key' => 'support', '--handler' => stdClass::class])->assertFailed();
 
@@ -194,4 +204,12 @@ describe('whatsapp:phone:list', function () {
 class PhoneCommandsTestHandler implements MessageHandlerInterface
 {
     public function handle(IncomingMessageContext $context): void {}
+}
+
+class PhoneCommandsTestFlowHandler implements FlowHandlerInterface
+{
+    public function handle(FlowRequest $request): FlowResponse
+    {
+        return FlowResponse::screen('DONE');
+    }
 }

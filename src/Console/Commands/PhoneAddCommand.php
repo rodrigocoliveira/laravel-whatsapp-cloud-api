@@ -15,6 +15,7 @@ class PhoneAddCommand extends PhoneCommand
                             {--business-account-id= : WhatsApp Business Account ID}
                             {--token= : Access token for this phone; pass the flag alone to be prompted, omit it to inherit WHATSAPP_ACCESS_TOKEN}
                             {--handler= : Class implementing MessageHandlerInterface}
+                            {--flow-handler= : Default class implementing FlowHandlerInterface for flows sent from this phone}
                             {--batch-window= : Seconds to wait before processing a batch}
                             {--inactive : Register the phone as inactive}';
 

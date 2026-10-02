@@ -10,6 +10,11 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // The phone's default flow handler, like `handler` is for messages.
+        Schema::table('whatsapp_phones', function (Blueprint $table) {
+            $table->string('flow_handler')->nullable()->after('handler');
+        });
+
         // A local mirror of the flows on Meta, synced per phone like templates.
         Schema::create('whatsapp_flows', function (Blueprint $table) {
             $table->id();
@@ -49,5 +54,9 @@ return new class extends Migration
     {
         Schema::dropIfExists('whatsapp_flow_sessions');
         Schema::dropIfExists('whatsapp_flows');
+
+        Schema::table('whatsapp_phones', function (Blueprint $table) {
+            $table->dropColumn('flow_handler');
+        });
     }
 };

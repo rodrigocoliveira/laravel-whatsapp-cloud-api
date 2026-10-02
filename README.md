@@ -82,8 +82,9 @@ php artisan whatsapp:phone:list
 ```
 
 `update` only touches the options you pass (`--phone-id`, `--phone-number`, `--business-account-id`,
-`--token`, `--handler`, `--batch-window`, `--active`, `--inactive`); `--handler` is checked to
-implement `MessageHandlerInterface` at registration time; `list` shows whether a phone carries its
+`--token`, `--handler`, `--flow-handler`, `--batch-window`, `--active`, `--inactive`); `--handler`
+is checked to implement `MessageHandlerInterface` and `--flow-handler` to implement
+`FlowHandlerInterface` at registration time; `list` shows whether a phone carries its
 own token but never the token itself.
 
 A phone's own token is encrypted at rest with your `APP_KEY`; `$phone->access_token` always reads it
@@ -516,8 +517,18 @@ $context->replyWith()
     ->send();
 ```
 
-**Know who is on the other side.** The handler is chosen as the flow's own `handler`
-first, then `whatsapp.flows.handler`. It receives the session:
+**Know who is on the other side.** The handler is chosen in this order:
+
+1. The flow's own `whatsapp_flows.handler`.
+2. The sending phone's default, `whatsapp_phones.flow_handler`, set with
+   `php artisan whatsapp:phone:update vendas --flow-handler="App\WhatsApp\VendasFlows"`.
+   It works like the phone's message `handler`, so two WABAs in one app can route differently.
+3. `whatsapp.flows.handler`.
+
+`flowNamed()` switches to `data_exchange` only for a flow with its own `handler`. When you
+rely on the phone default, call `->flowDataExchange()` yourself.
+
+The handler receives the session:
 
 ```php
 public function handle(FlowRequest $request): FlowResponse

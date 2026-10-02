@@ -20,6 +20,7 @@ use Multek\LaravelWhatsAppCloud\Support\PhoneNumberHelper;
  * @property string $business_account_id
  * @property string|null $access_token
  * @property string|null $handler
+ * @property string|null $flow_handler
  * @property array|null $handler_config
  * @property string $processing_mode
  * @property int $batch_window_seconds
@@ -57,6 +58,7 @@ class WhatsAppPhone extends Model
         'business_account_id',
         'access_token',
         'handler',
+        'flow_handler',
         'handler_config',
         'processing_mode',
         'batch_window_seconds',

@@ -137,7 +137,8 @@ Media: `MediaDownloaded`, `AudioTranscribed`, `AudioTranscriptionFailed`
 
 Endpoint-backed flows are served by `FlowEndpointController` at `webhooks/whatsapp/flow`,
 guarded by `whatsapp.flows.endpoint_enabled`. Implement `FlowHandlerInterface` and set it on
-the synced flow (`whatsapp_flows.handler`) or as the `whatsapp.flows.handler` fallback.
+the synced flow (`whatsapp_flows.handler`), as the phone default (`whatsapp_phones.flow_handler`,
+`--flow-handler` on `whatsapp:phone:add/update`) or as the `whatsapp.flows.handler` fallback.
 `FlowEncryptionService` owns the RSA-OAEP/AES-GCM handshake; `ping` and `error` actions are
 answered by the controller, never by the handler.
 
