@@ -26,13 +26,25 @@ class VerifyWhatsAppSignature
             return $next($request);
         }
 
+        static::verify($request);
+
+        return $next($request);
+    }
+
+    /**
+     * Check Meta's `X-Hub-Signature-256` over the raw body. Skipped while no app secret is set.
+     *
+     * @throws WebhookVerificationException
+     */
+    public static function verify(Request $request): void
+    {
         $appSecret = config('whatsapp.webhook.app_secret');
 
         // If no app secret is configured, skip verification
         if (empty($appSecret)) {
             Log::warning('WhatsApp webhook signature verification is disabled: whatsapp.webhook.app_secret is empty.');
 
-            return $next($request);
+            return;
         }
 
         $signature = $request->header('X-Hub-Signature-256');
@@ -57,7 +69,5 @@ class VerifyWhatsAppSignature
         if (! hash_equals($expectedHash, $receivedHash)) {
             throw WebhookVerificationException::invalidSignature();
         }
-
-        return $next($request);
     }
 }

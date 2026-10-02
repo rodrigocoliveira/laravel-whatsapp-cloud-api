@@ -8,6 +8,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Multek\LaravelWhatsAppCloud\Client\WhatsAppClient;
+use Multek\LaravelWhatsAppCloud\Events\FlowCompleted;
 use Multek\LaravelWhatsAppCloud\Events\MessageDelivered;
 use Multek\LaravelWhatsAppCloud\Events\MessageFailed;
 use Multek\LaravelWhatsAppCloud\Events\MessageFiltered;
@@ -16,6 +17,7 @@ use Multek\LaravelWhatsAppCloud\Events\MessageReceived;
 use Multek\LaravelWhatsAppCloud\Events\MessageSent;
 use Multek\LaravelWhatsAppCloud\Jobs\WhatsAppProcessIncomingMessage;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppConversation;
+use Multek\LaravelWhatsAppCloud\Models\WhatsAppFlowSession;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppMessage;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppPhone;
 
@@ -203,8 +205,47 @@ class WebhookProcessor
             return;
         }
 
+        if ($message->isFlowResponse() && ! $this->completeFlowSession($message)) {
+            return;
+        }
+
         // Dispatch job for further processing
         WhatsAppProcessIncomingMessage::dispatch($message);
+    }
+
+    /**
+     * Link a submitted flow to the session it was sent with.
+     *
+     * Returns false for a second submission of an already answered flow message, which
+     * is filtered instead of processed: static flows never reach the endpoint, so this
+     * is the only place their single use can be enforced.
+     */
+    protected function completeFlowSession(WhatsAppMessage $message): bool
+    {
+        $data = $message->getFlowData() ?? [];
+        $token = $data['flow_token'] ?? null;
+        $session = is_string($token) ? WhatsAppFlowSession::firstWhere('flow_token', $token) : null;
+
+        if ($session === null) {
+            return true;
+        }
+
+        if ($session->response_message_id !== null && $session->isSingleUse()) {
+            $message->markAsFiltered('Flow already submitted');
+            event(new MessageFiltered($message, 'Flow already submitted'));
+
+            return false;
+        }
+
+        unset($data['flow_token']);
+
+        // An endpoint flow already stored what its handler completed with.
+        $session->update(['response_message_id' => $message->id]);
+        $session->markAsCompleted($session->result ?: $data);
+
+        event(new FlowCompleted($session, $message));
+
+        return true;
     }
 
     /**

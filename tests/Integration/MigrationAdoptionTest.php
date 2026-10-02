@@ -38,12 +38,12 @@ it('adopts the published migration history once the consumer deletes the copies'
     expect($ran)->toContain('2024_01_01_000001_create_whatsapp_phones_table')
         ->and($ran)->not->toContain('2026_02_06_235401_create_whatsapp_phones_table')
         ->and($ran)->toContain('2024_01_01_000012_add_last_inbound_message_at_to_whatsapp_conversations')
-        ->and($ran)->toHaveCount(13)
+        ->and($ran)->toHaveCount(14)
         ->and(Schema::hasTable('whatsapp_phones'))->toBeTrue();
 
     Artisan::call('migrate');
 
-    expect($this->ranMigrations())->toHaveCount(13);
+    expect($this->ranMigrations())->toHaveCount(14);
 });
 
 it('refuses to migrate a fresh database while unpublished vendor migrations would run before the published copies', function () {

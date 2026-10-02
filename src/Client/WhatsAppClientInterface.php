@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Multek\LaravelWhatsAppCloud\Client;
 
+use Multek\LaravelWhatsAppCloud\Exceptions\FlowSyncException;
 use Multek\LaravelWhatsAppCloud\Exceptions\TemplateSyncException;
 
 interface WhatsAppClientInterface
@@ -194,6 +195,15 @@ interface WhatsAppClientInterface
      * @throws TemplateSyncException
      */
     public function getTemplate(string $templateName): array;
+
+    /**
+     * Get every flow for the business account.
+     *
+     * @return array<int, array<string, mixed>>
+     *
+     * @throws FlowSyncException
+     */
+    public function getFlows(): array;
 
     /**
      * Get phone number info.

@@ -7,6 +7,7 @@ namespace Multek\LaravelWhatsAppCloud\DTOs;
 use Illuminate\Support\Collection;
 use Multek\LaravelWhatsAppCloud\Client\WhatsAppClient;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppConversation;
+use Multek\LaravelWhatsAppCloud\Models\WhatsAppFlowSession;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppMessage;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppMessageBatch;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppPhone;
@@ -203,6 +204,24 @@ readonly class IncomingMessageContext
             ->map(fn (WhatsAppMessage $message) => $message->getFlowData() ?? [])
             ->values()
             ->all();
+    }
+
+    /**
+     * Get the sessions of the flows submitted in this batch, with their flow loaded.
+     *
+     * Only flows sent by the package have a session; `name` comes from `$session->flow`
+     * when the flow was synced, and `result` holds what the flow completed with.
+     *
+     * @return Collection<int, WhatsAppFlowSession>
+     */
+    public function getCompletedFlows(): Collection
+    {
+        /** @var Collection<int, WhatsAppFlowSession> $sessions */
+        $sessions = WhatsAppFlowSession::with('flow')
+            ->whereIn('response_message_id', $this->getFlowResponses()->pluck('id'))
+            ->get();
+
+        return $sessions;
     }
 
     /**

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Multek\LaravelWhatsAppCloud\Console\Commands;
 
 use Illuminate\Console\Command;
+use Multek\LaravelWhatsAppCloud\Jobs\WhatsAppSyncFlows;
 use Multek\LaravelWhatsAppCloud\Jobs\WhatsAppSyncTemplates;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppPhone;
 use Throwable;
@@ -16,6 +17,9 @@ class SyncTemplatesCommand extends Command
                             {--queue : Queue the sync jobs instead of running immediately}';
 
     protected $description = 'Sync message templates from Meta for WhatsApp phones';
+
+    /** What is being synced, for the output. */
+    protected string $resource = 'template';
 
     public function handle(): int
     {
@@ -39,14 +43,14 @@ class SyncTemplatesCommand extends Command
             return self::FAILURE;
         }
 
-        $this->info('Syncing templates for '.count($phones).' phone(s)...');
+        $this->info("Syncing {$this->resource}s for ".count($phones).' phone(s)...');
         $this->newLine();
 
         $failed = 0;
 
         foreach ($phones as $phone) {
             if ($useQueue) {
-                WhatsAppSyncTemplates::dispatch($phone);
+                dispatch($this->job($phone));
                 $this->line("  <comment>[{$phone->key}]</comment> Queued for sync");
             } elseif (! $this->syncPhone($phone)) {
                 $failed++;
@@ -56,22 +60,26 @@ class SyncTemplatesCommand extends Command
         $this->newLine();
 
         if ($failed > 0) {
-            $this->error("Template sync failed for {$failed} of ".count($phones).' phone(s).');
+            $this->error(ucfirst($this->resource)." sync failed for {$failed} of ".count($phones).' phone(s).');
 
             return 1; // Command::FAILURE
         }
 
-        $this->info('Template sync '.($useQueue ? 'queued' : 'completed').' successfully!');
+        $this->info(ucfirst($this->resource).' sync '.($useQueue ? 'queued' : 'completed').' successfully!');
 
         return self::SUCCESS;
+    }
+
+    protected function job(WhatsAppPhone $phone): WhatsAppSyncTemplates|WhatsAppSyncFlows
+    {
+        return new WhatsAppSyncTemplates($phone);
     }
 
     protected function syncPhone(WhatsAppPhone $phone): bool
     {
         try {
             $this->components->task("Syncing [{$phone->key}] ({$phone->phone_number})", function () use ($phone) {
-                $job = new WhatsAppSyncTemplates($phone);
-                $job->handle();
+                $this->job($phone)->handle();
             });
 
             return true;

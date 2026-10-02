@@ -29,6 +29,18 @@ readonly class FlowResponse
     }
 
     /**
+     * Stay on (or move to) a screen and show an error message there.
+     *
+     * The flow JSON reads it from `${data.error_message}`.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public static function error(string $screen, string $message, array $data = []): self
+    {
+        return new self($screen, ['error_message' => $message] + $data);
+    }
+
+    /**
      * Close the flow. The token is echoed back to the client as the flow completes.
      *
      * @param  array<string, mixed>  $data  Extra payload delivered with the completion.
@@ -40,6 +52,24 @@ readonly class FlowResponse
                 'params' => array_merge(['flow_token' => $flowToken], $data),
             ],
         ]);
+    }
+
+    public function isComplete(): bool
+    {
+        return $this->screen === 'SUCCESS';
+    }
+
+    /**
+     * The params delivered with the completion, without the echoed flow token.
+     *
+     * @return array<string, mixed>
+     */
+    public function completionParams(): array
+    {
+        $params = $this->data['extension_message_response']['params'] ?? [];
+        unset($params['flow_token']);
+
+        return $params;
     }
 
     /**
