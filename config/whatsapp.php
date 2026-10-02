@@ -48,8 +48,20 @@ return [
         'private_key' => env('WHATSAPP_FLOW_PRIVATE_KEY'),
         'private_key_passphrase' => env('WHATSAPP_FLOW_PRIVATE_KEY_PASSPHRASE'),
 
-        // A class implementing FlowHandlerInterface.
+        // A class implementing FlowHandlerInterface. A synced flow's own `handler`
+        // column (whatsapp_flows) takes precedence.
         'handler' => env('WHATSAPP_FLOW_HANDLER'),
+
+        // A completed flow message refuses further requests with HTTP 427, which
+        // disables its button. Overridable per flow (whatsapp_flows.single_use).
+        'single_use' => env('WHATSAPP_FLOW_SINGLE_USE', true),
+
+        // Hours a flow message stays usable after it is sent; null never expires.
+        // Overridable per flow (whatsapp_flows.session_ttl_hours).
+        'session_ttl_hours' => env('WHATSAPP_FLOW_SESSION_TTL_HOURS'),
+
+        // Shown to the user on a 427. Null uses the package's default.
+        'token_no_longer_valid_message' => env('WHATSAPP_FLOW_TOKEN_NO_LONGER_VALID_MESSAGE'),
     ],
 
     /*

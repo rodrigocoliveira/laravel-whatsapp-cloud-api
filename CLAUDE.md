@@ -90,6 +90,8 @@ tests/                        # Pest test suite
 | `WhatsAppMessage` | All inbound/outbound messages |
 | `WhatsAppMessageBatch` | Groups messages for batch processing |
 | `WhatsAppTemplate` | Cached message templates from Meta |
+| `WhatsAppFlow` | Flows mirrored from Meta per phone (`whatsapp:sync-flows`); `handler`/`single_use`/`session_ttl_hours` are app-owned |
+| `WhatsAppFlowSession` | One per flow message sent: maps `flow_token` → message, conversation, flow; status, state, result |
 
 ### Job Pipeline
 
@@ -105,6 +107,7 @@ WhatsAppProcessIncomingMessage
 
 Inbound: `MessageReceived`, `MessageFiltered`, `MessageReady`, `BatchReady`, `BatchProcessed`
 Outbound: `MessageSent`, `MessageDelivered`, `MessageRead`, `MessageFailed`
+Flows: `FlowCompleted`
 Media: `MediaDownloaded`, `AudioTranscribed`, `AudioTranscriptionFailed`
 
 ## Adding New Features
@@ -133,9 +136,17 @@ Media: `MediaDownloaded`, `AudioTranscribed`, `AudioTranscriptionFailed`
 ### Adding a WhatsApp Flow Screen Handler
 
 Endpoint-backed flows are served by `FlowEndpointController` at `webhooks/whatsapp/flow`,
-guarded by `whatsapp.flows.endpoint_enabled`. Implement `FlowHandlerInterface` and set
-`whatsapp.flows.handler`. `FlowEncryptionService` owns the RSA-OAEP/AES-GCM handshake;
-`ping` and `error` actions are answered by the controller, never by the handler.
+guarded by `whatsapp.flows.endpoint_enabled`. Implement `FlowHandlerInterface` and set it on
+the synced flow (`whatsapp_flows.handler`) or as the `whatsapp.flows.handler` fallback.
+`FlowEncryptionService` owns the RSA-OAEP/AES-GCM handshake; `ping` and `error` actions are
+answered by the controller, never by the handler.
+
+Meta's requests carry only the `flow_token`, so `MessageBuilder` records a
+`WhatsAppFlowSession` on every flow send and the controller injects it into `FlowRequest`
+(`session()`, `conversation()`, `phone()`, `flow()`). Status codes: 432 bad signature
+(`VerifyWhatsAppSignature::verify`), 421 undecryptable, 427 expired/single-use session or
+`FlowTokenException` from a handler. `WebhookProcessor` links the `nfm_reply` to the session,
+fires `FlowCompleted`, and filters a second submission of a single-use flow.
 
 ### Adding a New Transcription Service
 
@@ -162,8 +173,9 @@ The `IncomingMessageContext` provides:
 - `$context->getMedia()` - Messages with downloaded media
 - `$context->getTranscriptions()` - Audio transcriptions
 - `$context->getFlowResponses()` / `$context->getFlowData()` - Submitted WhatsApp Flow forms
+- `$context->getCompletedFlows()` - Sessions of flows submitted in the batch (`flow`, `result`)
 - `$context->reply($text)` - Quick text reply
-- `$context->replyBuilder()` - Full `MessageBuilder` for complex replies
+- `$context->replyWith()` - Full `MessageBuilder` for complex replies
 
 ## Configuration Reference
 
@@ -181,7 +193,9 @@ Key configuration options in `config/whatsapp.php`:
 | `webhook.app_secret` | env | Secret for signature verification |
 | `flows.endpoint_enabled` | `false` | Serve the Flow data-exchange endpoint |
 | `flows.private_key` | env | Business private key (PEM or path) for Flow encryption |
-| `flows.handler` | env | `FlowHandlerInterface` implementation for dynamic Flows |
+| `flows.handler` | env | Fallback `FlowHandlerInterface` when the synced flow has no `handler` |
+| `flows.single_use` | `true` | Completed flow messages answer 427 |
+| `flows.session_ttl_hours` | `null` | Hours a flow message stays usable |
 | `media.storage_disk` | `local` | Laravel disk for media storage |
 | `media.storage_path` | `whatsapp/media` | Path on disk |
 | `pricing.currency` | `USD` | Currency of the rate card |

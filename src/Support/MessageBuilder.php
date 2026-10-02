@@ -11,6 +11,8 @@ use Multek\LaravelWhatsAppCloud\Events\MessageSent;
 use Multek\LaravelWhatsAppCloud\Exceptions\MessageSendException;
 use Multek\LaravelWhatsAppCloud\Jobs\WhatsAppSendMessage;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppConversation;
+use Multek\LaravelWhatsAppCloud\Models\WhatsAppFlow;
+use Multek\LaravelWhatsAppCloud\Models\WhatsAppFlowSession;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppMessage;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppPhone;
 use Multek\LaravelWhatsAppCloud\Services\MediaService;
@@ -93,6 +95,8 @@ class MessageBuilder
     protected string $flowAction = 'navigate';
 
     protected ?string $flowMode = null;
+
+    protected ?WhatsAppFlow $flowModel = null;
 
     // Contacts
     /** @var array<int, array<string, mixed>> */
@@ -422,6 +426,28 @@ class MessageBuilder
     }
 
     /**
+     * Send a synced flow by name (see `whatsapp:sync-flows`), looked up on the current phone.
+     *
+     * A flow with a handler is opened with `data_exchange`, so its first screen calls the endpoint.
+     */
+    public function flowNamed(string $name, string $body, string $cta): self
+    {
+        $this->flowModel = $this->phone->flows()
+            ->where('name', $name)
+            ->where('status', '!=', WhatsAppFlow::STATUS_DELETED)
+            ->first()
+            ?? throw new \InvalidArgumentException("No flow named '{$name}' on phone '{$this->phone->key}'. Run whatsapp:sync-flows first.");
+
+        $this->flow($body, $this->flowModel->flow_id, $cta);
+
+        if ($this->flowModel->handler !== null) {
+            $this->flowDataExchange();
+        }
+
+        return $this;
+    }
+
+    /**
      * Set the flow token echoed back on the flow response. Generated when omitted.
      */
     public function flowToken(string $token): self
@@ -495,6 +521,7 @@ class MessageBuilder
         $result = $this->executeApiCall();
 
         $message = $this->createMessageRecord($result);
+        $this->recordFlowSession($message);
 
         event(new MessageSent($message));
 
@@ -508,6 +535,7 @@ class MessageBuilder
         $this->storeMediaFile();
 
         $message = $this->createPendingMessage();
+        $this->recordFlowSession($message);
 
         WhatsAppSendMessage::dispatch($message);
 
@@ -681,6 +709,30 @@ class MessageBuilder
             $this->ensureRecipient(),
             $this->conversation
         );
+    }
+
+    /**
+     * Remember what this flow token means, so the endpoint can tell who it is serving.
+     *
+     * A reused token starts over on the newest message.
+     */
+    protected function recordFlowSession(WhatsAppMessage $message): void
+    {
+        if ($this->messageType !== 'flow') {
+            return;
+        }
+
+        $flow = $this->flowModel ?? $this->phone->flows()->where('flow_id', $this->flowId)->first();
+
+        // Recreated, not updated, so a reused token's TTL counts from this send.
+        WhatsAppFlowSession::where('flow_token', $this->resolveFlowToken())->delete();
+
+        WhatsAppFlowSession::create([
+            'flow_token' => $this->resolveFlowToken(),
+            'whatsapp_flow_id' => $flow?->id,
+            'whatsapp_message_id' => $message->id,
+            'status' => WhatsAppFlowSession::STATUS_SENT,
+        ]);
     }
 
     /**

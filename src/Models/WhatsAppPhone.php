@@ -41,6 +41,7 @@ use Multek\LaravelWhatsAppCloud\Support\PhoneNumberHelper;
  * @property-read Collection<int, WhatsAppMessage> $messages
  * @property-read Collection<int, WhatsAppMessageBatch> $batches
  * @property-read Collection<int, WhatsAppTemplate> $templates
+ * @property-read Collection<int, WhatsAppFlow> $flows
  */
 class WhatsAppPhone extends Model
 {
@@ -134,6 +135,14 @@ class WhatsAppPhone extends Model
     public function templates(): HasMany
     {
         return $this->hasMany(WhatsAppTemplate::class, 'whatsapp_phone_id');
+    }
+
+    /**
+     * @return HasMany<WhatsAppFlow, $this>
+     */
+    public function flows(): HasMany
+    {
+        return $this->hasMany(WhatsAppFlow::class, 'whatsapp_phone_id');
     }
 
     protected static function booted(): void

@@ -150,17 +150,23 @@ class FlowTestCommand extends Command
 
         $this->line("Pinging {$url} ...");
 
-        $response = Http::timeout(30)->post($url, [
+        $body = (string) json_encode([
             'encrypted_flow_data' => base64_encode($ciphertext.$tag),
             'encrypted_aes_key' => base64_encode($encryptedKey),
             'initial_vector' => base64_encode($initialVector),
         ]);
 
+        // Sign like Meta does; the endpoint rejects unsigned requests while an app secret is set.
+        $response = Http::timeout(30)
+            ->withHeaders(['X-Hub-Signature-256' => 'sha256='.hash_hmac('sha256', $body, (string) config('whatsapp.webhook.app_secret'))])
+            ->withBody($body, 'application/json')
+            ->post($url);
+
         if (! $response->successful()) {
             $this->error("The endpoint answered {$response->status()}.");
             $this->line($response->status() === 421
                 ? 'A 421 means it could not decrypt the request — the configured key does not match.'
-                : 'A 404 means the endpoint is disabled; a 500 means the handler failed.');
+                : 'A 404 means the endpoint is disabled; a 432 means the signature did not match whatsapp.webhook.app_secret; a 500 means the handler failed.');
 
             return self::FAILURE;
         }

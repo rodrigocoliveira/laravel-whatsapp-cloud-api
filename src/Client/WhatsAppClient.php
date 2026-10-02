@@ -7,6 +7,7 @@ namespace Multek\LaravelWhatsAppCloud\Client;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Multek\LaravelWhatsAppCloud\Exceptions\FlowSyncException;
 use Multek\LaravelWhatsAppCloud\Exceptions\MediaDownloadException;
 use Multek\LaravelWhatsAppCloud\Exceptions\MessageSendException;
 use Multek\LaravelWhatsAppCloud\Exceptions\TemplateSyncException;
@@ -517,19 +518,49 @@ class WhatsAppClient implements WhatsAppClientInterface
      */
     public function getTemplates(?string $status = null): array
     {
-        $query = array_filter([
+        return $this->getAllPages($this->getTemplatesEndpoint(), array_filter([
             'fields' => 'id,name,language,status,category,components,parameter_format,rejected_reason',
             'limit' => 100,
             'status' => $status,
-        ]);
+        ]), TemplateSyncException::class);
+    }
 
-        $templates = [];
-        $url = $this->getTemplatesEndpoint();
+    /**
+     * Get every flow for the business account, following Meta's pagination.
+     *
+     * Flows belong to the WhatsApp Business Account, not to the phone number. Each
+     * entry carries Meta's default fields: id, name, status, categories, validation_errors.
+     *
+     * @throws FlowSyncException when any page fails or is malformed; a partial list is never returned
+     */
+    public function getFlows(): array
+    {
+        return $this->getAllPages(
+            "{$this->baseUrl}/{$this->apiVersion}/{$this->phone->business_account_id}/flows",
+            ['limit' => 100],
+            FlowSyncException::class
+        );
+    }
+
+    /**
+     * Collect every page of a Graph API list.
+     *
+     * A page with `data: []` means zero items. A failed page, a successful page
+     * without a `data` array, or a repeated `paging.next` URL throws instead, so a
+     * partial or unreadable result is never mistaken for a complete list.
+     *
+     * @param  array<string, mixed>  $query
+     * @param  class-string<TemplateSyncException|FlowSyncException>  $exception
+     * @return array<int, array<string, mixed>>
+     */
+    protected function getAllPages(string $url, array $query, string $exception): array
+    {
+        $items = [];
         $visited = [];
 
         while ($url !== null) {
             if (isset($visited[$url])) {
-                throw TemplateSyncException::malformedPage("paging.next repeated an already visited page ({$url})");
+                throw $exception::malformedPage("paging.next repeated an already visited page ({$url})");
             }
 
             $visited[$url] = true;
@@ -540,23 +571,23 @@ class WhatsAppClient implements WhatsAppClientInterface
                 : $this->http()->get($url);
 
             if (! $response->successful()) {
-                throw TemplateSyncException::fetchFailed($response->status(), $response->json('error'));
+                throw $exception::fetchFailed($response->status(), $response->json('error'));
             }
 
             $data = $response->json('data');
 
             if (! is_array($data)) {
-                throw TemplateSyncException::malformedPage('the response has no data array');
+                throw $exception::malformedPage('the response has no data array');
             }
 
-            array_push($templates, ...$data);
+            array_push($items, ...$data);
 
             // paging.next already carries the query and the cursor
             $url = $response->json('paging.next');
             $query = [];
         }
 
-        return $templates;
+        return $items;
     }
 
     /**

@@ -53,7 +53,7 @@ abstract class TestCase extends BaseTestCase
      *
      * @param  array<string, mixed>  $payload
      */
-    protected function generateSignature(array $payload): string
+    public function generateSignature(array $payload): string
     {
         $secret = config('whatsapp.webhook.app_secret');
         $payloadString = json_encode($payload);

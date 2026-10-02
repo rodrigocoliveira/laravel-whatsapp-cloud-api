@@ -471,10 +471,94 @@ class SignupFlowHandler implements FlowHandlerInterface
 
 Send the flow with `->flowDataExchange()` so the first screen calls your endpoint.
 
-**How it is secured:** the endpoint has no signature check — authenticity comes from the
-encryption, since only Meta can encrypt with the public key you registered. Any payload
-that fails to decrypt is answered with `421`, which makes Meta refresh the public key. The
-private key is only ever read from config; per-phone keys are not supported.
+Inside a handler:
+
+- `$request->isInit()`, `isBack()` and `isDataExchange()` tell the actions apart.
+- `FlowResponse::error('SCREEN', 'CNPJ inválido')` keeps the user on a screen and sets
+  `error_message` for the flow JSON to show.
+- Throwing `FlowTokenException::noLongerValid('Pedido já realizado')` answers `427`: WhatsApp
+  shows the message and disables that flow message's button.
+
+**How it is secured:** Meta signs every endpoint request. While `whatsapp.webhook.app_secret`
+is set, a missing or wrong `X-Hub-Signature-256` is answered with `432`. Any payload that
+fails to decrypt is answered with `421`, which makes Meta refresh the public key. Use one
+key pair for every phone: the encrypted request does not say which number it is for, so the
+endpoint could not choose between per-phone keys.
+
+### Synced Flows and Flow Sessions
+
+Meta's endpoint requests carry only the `flow_token`. They do not say which phone, which
+conversation or which flow they belong to. So every flow the package sends records a
+**flow session** (`whatsapp_flow_sessions`) mapping its token to the outbound message, its
+phone and conversation, and the synced flow when there is one.
+
+**Mirror your flows** from Meta, per phone, like templates:
+
+```bash
+php artisan whatsapp:sync-flows --phone=vendas
+```
+
+Rows in `whatsapp_flows` hold Meta's `name`, `status`, `categories` and `validation_errors`.
+The sync never touches the columns that belong to your app: `handler`, `single_use` and
+`session_ttl_hours`. A flow no longer returned by Meta is marked `DELETED`, not removed.
+
+**Send a flow by name.** The flow id is resolved through the current phone, and a flow with
+a `handler` opens with `data_exchange`:
+
+```php
+WhatsAppFlow::query()
+    ->where('whatsapp_phone_id', $phone->id)
+    ->where('name', 'criar_pedido')
+    ->update(['handler' => CriarPedidoFlow::class]);
+
+$context->replyWith()
+    ->flowNamed('criar_pedido', 'Vamos abrir seu pedido', 'Abrir pedido')
+    ->send();
+```
+
+**Know who is on the other side.** The handler is chosen as the flow's own `handler`
+first, then `whatsapp.flows.handler`. It receives the session:
+
+```php
+public function handle(FlowRequest $request): FlowResponse
+{
+    $request->conversation();  // WhatsAppConversation behind the token
+    $request->phone();         // WhatsAppPhone that sent the flow
+    $request->flow();          // WhatsAppFlow, when it was synced
+    $request->session()->remember($request->data);  // keep data between screens
+
+    // ...
+}
+```
+
+All of these are `null` for tokens the package did not send, such as flows sent before
+upgrading or through the raw client. Those requests still reach the configured handler.
+
+**Single use and expiry.** A completed session refuses further requests with `427`, so a
+flow message creates one order, not two. To let the user start over, send a new flow
+message, which gets a new token. Configure it like this:
+
+| Config | Default | Per-flow override |
+|--------|---------|-------------------|
+| `whatsapp.flows.single_use` | `true` | `whatsapp_flows.single_use` |
+| `whatsapp.flows.session_ttl_hours` | `null` (never expires) | `whatsapp_flows.session_ttl_hours` |
+| `whatsapp.flows.token_no_longer_valid_message` | package default | — |
+
+Single use is enforced per token. Reusing a fixed `->flowToken()` across sends restarts its
+session on the newest message.
+
+**Completion.** `FlowResponse::complete()` stores its params as the session `result`. When
+the `nfm_reply` arrives, the package links it to the session, marks the session completed
+(static flows keep the submitted data as `result`) and fires `FlowCompleted`. Static flows
+never reach the endpoint, so a second submission of a single-use flow message is filtered
+there instead. In a message handler:
+
+```php
+foreach ($context->getCompletedFlows() as $session) {
+    $session->flow?->name;  // 'criar_pedido'
+    $session->result;       // ['pedido_id' => 123]
+}
+```
 
 ### Listening to Events
 
@@ -510,6 +594,7 @@ Event::listen(MediaDownloaded::class, function (MediaDownloaded $event) {
 | `MessageDelivered` | When message is delivered |
 | `MessageRead` | When message is read |
 | `MessageFailed` | When message send fails |
+| `FlowCompleted` | When a flow the package sent is submitted (`nfm_reply`) |
 | `MediaDownloaded` | After media saved locally |
 | `AudioTranscribed` | After audio transcribed |
 | `AudioTranscriptionFailed` | After transcription retries are exhausted (reason in `error_message`) |
@@ -835,6 +920,9 @@ php artisan whatsapp:phone:list
 # changed for that phone and the command reports it and exits with failure; queued syncs
 # via --queue are retried. Templates are never disabled by mistake)
 php artisan whatsapp:sync-templates
+
+# Mirror WhatsApp Flows from Meta into whatsapp_flows (same options as sync-templates)
+php artisan whatsapp:sync-flows
 
 # Process stale/stuck batches (runs automatically every 5 min)
 php artisan whatsapp:process-stale-batches

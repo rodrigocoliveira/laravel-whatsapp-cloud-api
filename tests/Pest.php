@@ -71,3 +71,36 @@ function generateFlowKeyPair(): array
 
     return [$privateKey, openssl_pkey_get_details($resource)['key']];
 }
+
+/**
+ * Post an encrypted request to the flow endpoint and return the decrypted response.
+ *
+ * @param  array<string, mixed>  $body
+ * @return array{status: int, data: array<string, mixed>|null}
+ */
+function postFlowRequest(array $body, string $publicKey): array
+{
+    $encrypted = encryptFlowRequest($body, $publicKey);
+
+    $response = test()->withHeader('X-Hub-Signature-256', test()->generateSignature($encrypted['payload']))
+        ->postJson('/webhooks/whatsapp/flow', $encrypted['payload']);
+
+    if ($response->getStatusCode() !== 200) {
+        // Error answers (e.g. 427's error_msg) are plain JSON, not encrypted.
+        return ['status' => $response->getStatusCode(), 'data' => json_decode((string) $response->getContent(), true)];
+    }
+
+    $raw = base64_decode($response->getContent());
+    $flippedIv = $encrypted['iv'] ^ str_repeat("\xff", strlen($encrypted['iv']));
+
+    $plaintext = openssl_decrypt(
+        substr($raw, 0, -16),
+        'aes-'.(strlen($encrypted['aesKey']) * 8).'-gcm',
+        $encrypted['aesKey'],
+        OPENSSL_RAW_DATA,
+        $flippedIv,
+        substr($raw, -16)
+    );
+
+    return ['status' => 200, 'data' => json_decode($plaintext, true)];
+}

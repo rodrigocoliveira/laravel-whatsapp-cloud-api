@@ -23,37 +23,6 @@ beforeEach(function () {
     ]);
 });
 
-/**
- * Post an encrypted request to the flow endpoint and return the decrypted response.
- *
- * @param  array<string, mixed>  $body
- * @return array{status: int, data: array<string, mixed>|null}
- */
-function postFlowRequest(array $body, string $publicKey): array
-{
-    $encrypted = encryptFlowRequest($body, $publicKey);
-
-    $response = test()->postJson('/webhooks/whatsapp/flow', $encrypted['payload']);
-
-    if ($response->getStatusCode() !== 200) {
-        return ['status' => $response->getStatusCode(), 'data' => null];
-    }
-
-    $raw = base64_decode($response->getContent());
-    $flippedIv = $encrypted['iv'] ^ str_repeat("\xff", strlen($encrypted['iv']));
-
-    $plaintext = openssl_decrypt(
-        substr($raw, 0, -16),
-        'aes-'.(strlen($encrypted['aesKey']) * 8).'-gcm',
-        $encrypted['aesKey'],
-        OPENSSL_RAW_DATA,
-        $flippedIv,
-        substr($raw, -16)
-    );
-
-    return ['status' => 200, 'data' => json_decode($plaintext, true)];
-}
-
 it('answers a health check ping', function () {
     $result = postFlowRequest([
         'version' => '3.0',
@@ -131,7 +100,8 @@ it('returns 421 when the request was encrypted with another key', function () {
 });
 
 it('returns 421 for a malformed payload', function () {
-    $this->postJson('/webhooks/whatsapp/flow', ['nonsense' => true])->assertStatus(421);
+    $this->withHeader('X-Hub-Signature-256', $this->generateSignature(['nonsense' => true]))
+        ->postJson('/webhooks/whatsapp/flow', ['nonsense' => true])->assertStatus(421);
 });
 
 it('returns 500 when the handler throws', function () {
