@@ -613,6 +613,76 @@ class WhatsAppClient implements WhatsAppClientInterface
     }
 
     /**
+     * Get the WhatsApp Business profile (photo, about, description...).
+     */
+    public function getBusinessProfile(): array
+    {
+        $response = $this->http()->get($this->getBusinessProfileEndpoint(), [
+            'fields' => 'about,address,description,email,profile_picture_url,websites,vertical',
+        ]);
+
+        if (! $response->successful()) {
+            throw MessageSendException::apiError($response->json('error.message', 'Unknown error'), $response->json('error'));
+        }
+
+        return $response->json('data.0', []);
+    }
+
+    /**
+     * Update WhatsApp Business profile fields.
+     */
+    public function updateBusinessProfile(array $fields): array
+    {
+        $response = $this->http()->post($this->getBusinessProfileEndpoint(), [
+            'messaging_product' => 'whatsapp',
+            ...$fields,
+        ]);
+
+        if (! $response->successful()) {
+            throw MessageSendException::apiError($response->json('error.message', 'Unknown error'), $response->json('error'));
+        }
+
+        return $response->json();
+    }
+
+    /**
+     * Upload a profile picture via the Resumable Upload API and set it on the profile.
+     */
+    public function updateProfilePicture(string $filePath, string $mimeType = 'image/jpeg'): array
+    {
+        $appId = config('whatsapp.app_id');
+
+        if (! $appId) {
+            throw MessageSendException::mediaUploadFailed('whatsapp.app_id (WHATSAPP_APP_ID) is required to upload a profile picture.');
+        }
+
+        $contents = (string) file_get_contents($filePath);
+
+        $session = $this->http()->post("{$this->baseUrl}/{$this->apiVersion}/{$appId}/uploads?".http_build_query([
+            'file_length' => strlen($contents),
+            'file_type' => $mimeType,
+        ]));
+
+        if (! $session->successful()) {
+            throw MessageSendException::mediaUploadFailed($session->json('error.message', 'Unknown error'));
+        }
+
+        // Resumable upload uses "OAuth" scheme, not Bearer
+        $upload = Http::withHeaders([
+            'Authorization' => "OAuth {$this->phone->access_token}",
+            'file_offset' => '0',
+        ])->withBody($contents, $mimeType)
+            ->timeout(60)
+            ->post("{$this->baseUrl}/{$this->apiVersion}/{$session->json('id')}");
+
+        if (! $upload->successful() || ! $upload->json('h')) {
+            throw MessageSendException::mediaUploadFailed($upload->json('error.message', 'Unknown error'));
+        }
+
+        return $this->updateBusinessProfile(['profile_picture_handle' => $upload->json('h')]);
+    }
+
+    /**
      * Send a message via the API.
      *
      * @param  array<string, mixed>  $payload
@@ -677,6 +747,14 @@ class WhatsAppClient implements WhatsAppClientInterface
     protected function getMediaEndpoint(): string
     {
         return "{$this->baseUrl}/{$this->apiVersion}/{$this->phone->phone_id}/media";
+    }
+
+    /**
+     * Get the business profile endpoint URL.
+     */
+    protected function getBusinessProfileEndpoint(): string
+    {
+        return "{$this->baseUrl}/{$this->apiVersion}/{$this->phone->phone_id}/whatsapp_business_profile";
     }
 
     /**

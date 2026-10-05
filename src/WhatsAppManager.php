@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Multek\LaravelWhatsAppCloud;
 
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Support\Facades\Cache;
 use Multek\LaravelWhatsAppCloud\Client\WhatsAppClient;
 use Multek\LaravelWhatsAppCloud\Client\WhatsAppClientInterface;
 use Multek\LaravelWhatsAppCloud\Exceptions\InvalidPhoneException;
@@ -225,6 +226,61 @@ class WhatsAppManager
         $this->ensurePhoneSelected();
 
         return $this->client->markAsRead($messageId);
+    }
+
+    /**
+     * Get the business profile as customers see it, cached.
+     *
+     * @return array<string, mixed>
+     */
+    public function profile(bool $fresh = false): array
+    {
+        $this->ensurePhoneSelected();
+
+        $key = $this->profileCacheKey();
+
+        if ($fresh) {
+            Cache::forget($key);
+        }
+
+        // ponytail: fixed TTL; Meta CDN picture URLs expire, keep it well below that
+        return Cache::remember($key, now()->addHours((int) config('whatsapp.profile_cache_hours', 6)), fn () => $this->client->getBusinessProfile());
+    }
+
+    /**
+     * Update business profile fields and drop the cached profile.
+     *
+     * @param  array<string, mixed>  $fields
+     * @return array<string, mixed>
+     */
+    public function updateProfile(array $fields): array
+    {
+        $this->ensurePhoneSelected();
+
+        $result = $this->client->updateBusinessProfile($fields);
+        Cache::forget($this->profileCacheKey());
+
+        return $result;
+    }
+
+    /**
+     * Upload and set the profile picture, then drop the cached profile.
+     *
+     * @return array<string, mixed>
+     */
+    public function updateProfilePicture(string $filePath, string $mimeType = 'image/jpeg'): array
+    {
+        $this->ensurePhoneSelected();
+
+        $result = $this->client->updateProfilePicture($filePath, $mimeType);
+        Cache::forget($this->profileCacheKey());
+
+        return $result;
+    }
+
+    protected function profileCacheKey(): string
+    {
+        return "whatsapp.profile.{$this->currentPhone->phone_id}";
     }
 
     /**

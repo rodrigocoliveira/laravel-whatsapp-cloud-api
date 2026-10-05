@@ -291,6 +291,23 @@ the normalized recipient (created if none exists, so inbound and outbound land o
 and `send()` fires `MessageSent` once the API call succeeds. `queue()` links the pending message the
 same way and fires `MessageSent` from the job after delivery.
 
+### Business Profile (photo, about, description)
+
+The profile lives at Meta, per phone number. Read it as customers see it — cached for
+`whatsapp.profile_cache_hours` (default 6h, below the lifetime of Meta's CDN picture URLs):
+
+```php
+$profile = WhatsApp::phone('support')->profile();          // cached
+$profile = WhatsApp::phone('support')->profile(fresh: true); // bypass cache
+$profile['profile_picture_url'];
+
+WhatsApp::phone('support')->updateProfile(['about' => 'Atendimento 8h-18h']);
+WhatsApp::phone('support')->updateProfilePicture('/path/logo.jpg'); // needs WHATSAPP_APP_ID
+```
+
+Updates made through the package clear the cache. Changes made elsewhere (WhatsApp Business app,
+Business Manager) show up when the cache expires or with `profile(fresh: true)`.
+
 ### Creating a Message Handler
 
 Create a handler class that implements `MessageHandlerInterface`:
