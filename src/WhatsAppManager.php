@@ -6,6 +6,7 @@ namespace Multek\LaravelWhatsAppCloud;
 
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Multek\LaravelWhatsAppCloud\Client\WhatsAppClient;
 use Multek\LaravelWhatsAppCloud\Client\WhatsAppClientInterface;
 use Multek\LaravelWhatsAppCloud\Exceptions\InvalidPhoneException;
@@ -240,11 +241,39 @@ class WhatsAppManager
         $key = $this->profileCacheKey();
 
         if ($fresh) {
-            Cache::forget($key);
+            $this->forgetProfileCache();
         }
 
         // ponytail: fixed TTL; Meta CDN picture URLs expire, keep it well below that
         return Cache::remember($key, now()->addHours((int) config('whatsapp.profile_cache_hours', 6)), fn () => $this->client->getBusinessProfile());
+    }
+
+    /**
+     * Get the profile picture URL without ever throwing; failures are logged and cached briefly.
+     */
+    public function profilePictureUrl(): ?string
+    {
+        $this->ensurePhoneSelected();
+
+        $failureKey = $this->profileCacheKey().'.failed';
+
+        if (Cache::has($failureKey)) {
+            return null;
+        }
+
+        try {
+            $url = $this->profile()['profile_picture_url'] ?? null;
+
+            return is_string($url) ? $url : null;
+        } catch (\Throwable $e) {
+            Log::warning('WhatsApp profile fetch failed', [
+                'phone_key' => $this->currentPhone?->key,
+                'error' => $e->getMessage(),
+            ]);
+            Cache::put($failureKey, true, now()->addMinutes((int) config('whatsapp.profile_failure_cache_minutes', 5)));
+
+            return null;
+        }
     }
 
     /**
@@ -258,7 +287,7 @@ class WhatsAppManager
         $this->ensurePhoneSelected();
 
         $result = $this->client->updateBusinessProfile($fields);
-        Cache::forget($this->profileCacheKey());
+        $this->forgetProfileCache();
 
         return $result;
     }
@@ -273,9 +302,15 @@ class WhatsAppManager
         $this->ensurePhoneSelected();
 
         $result = $this->client->updateProfilePicture($filePath, $mimeType);
-        Cache::forget($this->profileCacheKey());
+        $this->forgetProfileCache();
 
         return $result;
+    }
+
+    protected function forgetProfileCache(): void
+    {
+        Cache::forget($this->profileCacheKey());
+        Cache::forget($this->profileCacheKey().'.failed');
     }
 
     protected function profileCacheKey(): string

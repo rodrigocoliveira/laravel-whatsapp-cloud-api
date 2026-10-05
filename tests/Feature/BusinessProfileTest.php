@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Multek\LaravelWhatsAppCloud\Exceptions\MessageSendException;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppPhone;
 use Multek\LaravelWhatsAppCloud\WhatsAppManager;
@@ -64,3 +66,28 @@ it('requires an app id to upload a profile picture', function () {
     Http::fake();
     $this->manager->updateProfilePicture(__FILE__);
 })->throws(MessageSendException::class, 'app_id');
+
+it('returns the profile picture url', function () {
+    Http::fake(['*' => Http::response(['data' => [['profile_picture_url' => 'https://cdn.example/a.jpg']]])]);
+
+    expect($this->manager->profilePictureUrl())->toBe('https://cdn.example/a.jpg');
+});
+
+it('returns null on failure, caches the failure and lets fresh bypass it', function (Closure $failure) {
+    $ok = false;
+    Http::fake(function () use (&$ok, $failure) {
+        return $ok ? Http::response(['data' => [['profile_picture_url' => 'https://cdn.example/b.jpg']]]) : $failure();
+    });
+    Log::spy();
+
+    expect($this->manager->profilePictureUrl())->toBeNull();
+    $ok = true;
+    expect($this->manager->profilePictureUrl())->toBeNull();
+    Log::shouldHaveReceived('warning')->once()->withArgs(fn ($msg, $ctx) => $ctx['phone_key'] === 'test');
+
+    $this->manager->profile(fresh: true);
+    expect($this->manager->profilePictureUrl())->toBe('https://cdn.example/b.jpg');
+})->with([
+    'server error' => [fn () => fn () => Http::response(['error' => ['message' => 'boom']], 500)],
+    'connection error' => [fn () => fn () => throw new ConnectionException('timeout')],
+]);
