@@ -78,7 +78,7 @@ tests/                        # Pest test suite
 | `MediaService` | Downloads and stores media files |
 | `TranscriptionService` | Audio-to-text via OpenAI Whisper |
 | `MessageBuilder` | Fluent API for constructing outbound messages |
-| `PricingCalculator` | Maps Meta billing category + recipient country to a per-message rate |
+| `PricingCalculator` | Maps Meta billing category + recipient country to a per-message rate; the result is frozen in `whatsapp_messages.cost` when the pricing webhook arrives |
 | `IncomingMessageContext` | DTO passed to handlers with batch context |
 
 ### Database Models

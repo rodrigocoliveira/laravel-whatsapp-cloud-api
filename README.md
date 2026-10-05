@@ -658,6 +658,10 @@ E.164 dial-code prefix (longest match wins, `default` as fallback):
 ],
 ```
 
+When a status webhook carries pricing, the cost is computed against the rate card and
+frozen on the message (`cost`, `cost_currency`), so later rate card changes do not
+rewrite history. Messages without a frozen cost fall back to the current rate card.
+
 Then read the estimate on any message:
 
 ```php
@@ -666,11 +670,10 @@ $message->estimatedCost();  // 0.0625, 0.0 for non-billable or free_* types, or 
 
 // Monthly spend per category for one phone
 WhatsAppMessage::where('whatsapp_phone_id', $phone->id)
-    ->where('pricing_billable', true)
     ->whereBetween('sent_at', [$start, $end])
-    ->get()
     ->groupBy('pricing_category')
-    ->map(fn ($messages) => $messages->sum->estimatedCost());
+    ->selectRaw('pricing_category, sum(cost) as total')
+    ->pluck('total', 'pricing_category');
 ```
 
 Since 2026-10-01 Meta bills **service messages** (free-form replies inside the 24h

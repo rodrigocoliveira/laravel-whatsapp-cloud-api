@@ -61,6 +61,8 @@ use Multek\LaravelWhatsAppCloud\Support\PricingCalculator;
  * @property string|null $pricing_model
  * @property string|null $pricing_category
  * @property string|null $pricing_type
+ * @property float|null $cost
+ * @property string|null $cost_currency
  * @property string|null $meta_conversation_id
  * @property string|null $conversation_origin
  * @property Carbon|null $conversation_expires_at
@@ -211,6 +213,8 @@ class WhatsAppMessage extends Model
         'pricing_model',
         'pricing_category',
         'pricing_type',
+        'cost',
+        'cost_currency',
         'meta_conversation_id',
         'conversation_origin',
         'conversation_expires_at',
@@ -229,6 +233,7 @@ class WhatsAppMessage extends Model
         'delivered_at' => 'datetime',
         'read_at' => 'datetime',
         'pricing_billable' => 'boolean',
+        'cost' => 'float',
         'conversation_expires_at' => 'datetime',
     ];
 
@@ -342,25 +347,20 @@ class WhatsAppMessage extends Model
     /**
      * Estimated cost from the configured rate card (config `whatsapp.pricing`).
      *
+     * Uses the cost frozen when the pricing webhook arrived; messages without
+     * one (sent before it existed) are priced against the current rate card.
      * Returns null when pricing info has not arrived yet or no rate is
      * configured for the recipient's country and category; 0.0 when Meta
      * marked the message as not billable.
      */
     public function estimatedCost(): ?float
     {
-        if (str_starts_with((string) $this->pricing_type, 'free_')) {
-            return 0.0;
-        }
-
-        if ($this->pricing_billable === null) {
-            return null;
-        }
-
-        if ($this->pricing_billable === false) {
-            return 0.0;
-        }
-
-        return app(PricingCalculator::class)->rateFor($this->to, $this->pricing_category);
+        return $this->cost ?? app(PricingCalculator::class)->costFor(
+            $this->to,
+            $this->pricing_billable,
+            $this->pricing_category,
+            $this->pricing_type,
+        );
     }
 
     // Type checks
