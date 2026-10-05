@@ -81,11 +81,22 @@ php artisan whatsapp:phone:update support --token
 php artisan whatsapp:phone:list
 ```
 
+Both commands also set the per-phone behaviour: `--display-name=`, `--processing-mode=batch|immediate`,
+`--batch-max-messages=`, and the toggles `--transcription`/`--no-transcription`,
+`--auto-typing`/`--no-auto-typing` and `--auto-download-media`/`--no-auto-download-media`.
+Omitted flags keep the model default on `add`. Turn `--no-auto-typing` on when your handler sends
+its own typing indicator, since auto typing fires on every inbound message before any handler runs:
+
+```bash
+php artisan whatsapp:phone:add suppliers --phone-id=... --phone-number=+5511988887777 \
+    --business-account-id=... --display-name="Fornecedores" --transcription --no-auto-typing
+```
+
 `update` only touches the options you pass (`--phone-id`, `--phone-number`, `--business-account-id`,
-`--token`, `--handler`, `--flow-handler`, `--batch-window`, `--active`, `--inactive`); `--handler`
+`--token`, `--handler`, `--flow-handler`, `--batch-window`, the settings above, `--active`, `--inactive`); `--handler`
 is checked to implement `MessageHandlerInterface` and `--flow-handler` to implement
 `FlowHandlerInterface` at registration time; `list` shows whether a phone carries its
-own token but never the token itself.
+own token (never the token itself) and whether typing and transcription are on.
 
 A phone's own token is encrypted at rest with your `APP_KEY`; `$phone->access_token` always reads it
 back decrypted, and the token is hidden from `toArray()`/`toJson()`. Tokens stored in plaintext by earlier versions keep working and are encrypted the
