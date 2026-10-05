@@ -28,7 +28,7 @@ composer install
 ./vendor/bin/pint
 
 # Static analysis
-./vendor/bin/phpstan analyse
+./vendor/bin/phpstan analyse --memory-limit=1G
 ```
 
 ## Directory Structure

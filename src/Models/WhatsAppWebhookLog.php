@@ -46,7 +46,7 @@ class WhatsAppWebhookLog extends Model
     {
         $days = (int) config('whatsapp.webhook.log_retention_days', 30);
 
-        return static::where('created_at', '<=', now()->subDays($days));
+        return $this->newQuery()->where('created_at', '<=', now()->subDays($days));
     }
 
     /**
