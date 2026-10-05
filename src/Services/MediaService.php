@@ -83,7 +83,7 @@ class MediaService implements MediaStorageInterface
         $disk = Storage::disk($message->local_media_disk);
 
         // If disk supports temporary URLs (like S3), use them
-        if (method_exists($disk, 'temporaryUrl')) {
+        if ($disk->providesTemporaryUrls()) {
             try {
                 return $disk->temporaryUrl($message->local_media_path, now()->addHour());
             } catch (\Exception $e) {
