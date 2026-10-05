@@ -13,6 +13,7 @@ return [
     'access_token' => env('WHATSAPP_ACCESS_TOKEN'),
     'app_id' => env('WHATSAPP_APP_ID'), // needed only to upload a profile picture
     'profile_cache_hours' => 6,
+    'profile_failure_cache_minutes' => 5, // profilePictureUrl() skips Meta this long after a failure
 
     /*
     |--------------------------------------------------------------------------

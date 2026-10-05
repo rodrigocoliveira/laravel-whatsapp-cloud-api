@@ -301,6 +301,10 @@ $profile = WhatsApp::phone('support')->profile();          // cached
 $profile = WhatsApp::phone('support')->profile(fresh: true); // bypass cache
 $profile['profile_picture_url'];
 
+// Never throws: logs a warning and returns null on failure, then skips Meta for
+// whatsapp.profile_failure_cache_minutes (default 5). profile(fresh: true) and updates reset it.
+$url = WhatsApp::phone('support')->profilePictureUrl();
+
 WhatsApp::phone('support')->updateProfile(['about' => 'Atendimento 8h-18h']);
 WhatsApp::phone('support')->updateProfilePicture('/path/logo.jpg'); // needs WHATSAPP_APP_ID
 ```
