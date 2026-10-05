@@ -348,6 +348,10 @@ class WhatsAppMessage extends Model
      */
     public function estimatedCost(): ?float
     {
+        if (str_starts_with((string) $this->pricing_type, 'free_')) {
+            return 0.0;
+        }
+
         if ($this->pricing_billable === null) {
             return null;
         }

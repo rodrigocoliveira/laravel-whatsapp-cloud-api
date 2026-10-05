@@ -635,8 +635,8 @@ E.164 dial-code prefix (longest match wins, `default` as fallback):
 'pricing' => [
     'currency' => 'USD',
     'rates' => [
-        '55' => ['marketing' => 0.0625, 'utility' => 0.0080, 'authentication' => 0.0315, 'service' => 0.0],
-        'default' => ['service' => 0.0],
+        // Brazil, USD rate card effective 2026-10-01
+        '55' => ['marketing' => 0.0625, 'utility' => 0.0068, 'authentication' => 0.0068, 'service' => 0.0068],
     ],
 ],
 ```
@@ -645,7 +645,7 @@ Then read the estimate on any message:
 
 ```php
 $message->isBillable();     // true, false, or null if no status webhook with pricing yet
-$message->estimatedCost();  // 0.0625, 0.0 for non-billable, or null when no rate is configured
+$message->estimatedCost();  // 0.0625, 0.0 for non-billable or free_* types, or null when no rate is configured
 
 // Monthly spend per category for one phone
 WhatsAppMessage::where('whatsapp_phone_id', $phone->id)
@@ -656,8 +656,15 @@ WhatsAppMessage::where('whatsapp_phone_id', $phone->id)
     ->map(fn ($messages) => $messages->sum->estimatedCost());
 ```
 
+Since 2026-10-01 Meta bills **service messages** (free-form replies inside the 24h
+customer service window): each business phone number gets 1,000 free per month, and
+every service message after that is billed at the market's service rate. The package
+does not count the allowance itself; it relies on Meta's `pricing.billable` and
+`pricing.type` (`free_customer_service`, `free_entry_point`) on each status webhook.
+A market or category missing from the rate card returns `null`, never "free".
+
 Always verify the shipped rates against Meta's current rate card
-(<https://developers.facebook.com/docs/whatsapp/pricing>). For exact billed amounts
+(<https://developers.facebook.com/documentation/business-messaging/whatsapp/pricing>). For exact billed amounts
 use the WABA `pricing_analytics` Graph API endpoint, which reports cost aggregated by
 day, country and category.
 

@@ -99,6 +99,35 @@ it('estimates zero cost for non-billable messages', function () {
         ->and($message->estimatedCost())->toBe(0.0);
 });
 
+it('estimates billable service messages from the shipped rate card', function () {
+    $message = createOutboundMessage('wamid.cost5', '+5511999999999');
+    $message->update([
+        'pricing_billable' => true,
+        'pricing_category' => 'service',
+        'pricing_type' => 'regular',
+    ]);
+
+    expect($message->estimatedCost())->toBe(0.0068);
+});
+
+it('estimates zero cost for free pricing types even when billable is missing', function (string $type) {
+    $message = createOutboundMessage('wamid.free.'.$type, '+5511999999999');
+    $message->update([
+        'pricing_billable' => null,
+        'pricing_category' => 'service',
+        'pricing_type' => $type,
+    ]);
+
+    expect($message->estimatedCost())->toBe(0.0);
+})->with(['free_customer_service', 'free_entry_point']);
+
+it('returns null cost for an unknown market instead of treating it as free', function () {
+    $message = createOutboundMessage('wamid.cost6', '+15551230000');
+    $message->update(['pricing_billable' => true, 'pricing_category' => 'service']);
+
+    expect($message->estimatedCost())->toBeNull();
+});
+
 it('returns null cost when pricing information has not arrived yet', function () {
     $message = createOutboundMessage('wamid.cost3', '+5511999999999');
 
