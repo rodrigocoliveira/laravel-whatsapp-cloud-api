@@ -136,15 +136,14 @@ return [
     'pricing' => [
         'currency' => env('WHATSAPP_PRICING_CURRENCY', 'USD'),
         'rates' => [
-            // Brazil
+            // Brazil, Meta USD rate card effective 2026-10-01. Service messages
+            // are billed beyond 1,000 free per number per month; Meta's
+            // pricing.billable/type already reflect the allowance.
             '55' => [
                 'marketing' => 0.0625,
-                'utility' => 0.0080,
-                'authentication' => 0.0315,
-                'service' => 0.0,
-            ],
-            'default' => [
-                'service' => 0.0,
+                'utility' => 0.0068,
+                'authentication' => 0.0068,
+                'service' => 0.0068,
             ],
         ],
     ],
