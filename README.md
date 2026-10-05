@@ -662,6 +662,12 @@ When a status webhook carries pricing, the cost is computed against the rate car
 frozen on the message (`cost`, `cost_currency`), so later rate card changes do not
 rewrite history. Messages without a frozen cost fall back to the current rate card.
 
+The cost is the **list (tier 1) rate**, an upper bound. Meta discounts utility and
+authentication by monthly volume tiers counted across the whole business portfolio,
+and webhooks do not report the tier, so the actual charge can be lower. Keep
+`pricing.currency` and the rates in your WABA's billing currency (e.g. the BRL rate
+card for a BRL WABA); Meta does not convert between them.
+
 Then read the estimate on any message:
 
 ```php
