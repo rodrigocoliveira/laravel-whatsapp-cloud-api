@@ -11,6 +11,9 @@ use Multek\LaravelWhatsAppCloud\WhatsAppManager;
 
 /**
  * @method static WhatsAppManager phone(string $key)
+ * @method static array profile(bool $fresh = false)
+ * @method static array updateProfile(array $fields)
+ * @method static array updateProfilePicture(string $filePath, string $mimeType = 'image/jpeg')
  * @method static MessageBuilder to(string $phone)
  * @method static WhatsAppMessage sendText(string $to, string $message, bool $previewUrl = false)
  * @method static WhatsAppMessage sendImage(string $to, string $urlOrMediaId, ?string $caption = null)

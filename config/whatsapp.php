@@ -11,6 +11,8 @@ return [
     'api_version' => env('WHATSAPP_API_VERSION', 'v24.0'),
     'api_base_url' => 'https://graph.facebook.com',
     'access_token' => env('WHATSAPP_ACCESS_TOKEN'),
+    'app_id' => env('WHATSAPP_APP_ID'), // needed only to upload a profile picture
+    'profile_cache_hours' => 6,
 
     /*
     |--------------------------------------------------------------------------

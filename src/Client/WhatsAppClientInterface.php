@@ -211,4 +211,26 @@ interface WhatsAppClientInterface
      * @return array<string, mixed>
      */
     public function getPhoneNumberInfo(): array;
+
+    /**
+     * Get the WhatsApp Business profile.
+     *
+     * @return array<string, mixed>
+     */
+    public function getBusinessProfile(): array;
+
+    /**
+     * Update WhatsApp Business profile fields (about, description, email, websites...).
+     *
+     * @param  array<string, mixed>  $fields
+     * @return array<string, mixed>
+     */
+    public function updateBusinessProfile(array $fields): array;
+
+    /**
+     * Upload and set the profile picture. Requires whatsapp.app_id.
+     *
+     * @return array<string, mixed>
+     */
+    public function updateProfilePicture(string $filePath, string $mimeType = 'image/jpeg'): array;
 }
