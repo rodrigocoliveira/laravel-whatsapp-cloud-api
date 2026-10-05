@@ -184,10 +184,10 @@ describe('whatsapp:phone:list', function () {
 
         $this->artisan('whatsapp:phone:list')
             ->expectsTable(
-                ['Key', 'Number', 'Phone ID', 'Handler', 'Token', 'Active'],
+                ['Key', 'Number', 'Phone ID', 'Handler', 'Token', 'Active', 'Typing', 'Transcription'],
                 [
-                    ['negotiator', '+5511888888888', '20987654321', '-', 'app-wide', 'no'],
-                    ['support', '+5511999999999', '10987654321', PhoneCommandsTestHandler::class, 'own', 'yes'],
+                    ['negotiator', '+5511888888888', '20987654321', '-', 'app-wide', 'no', 'yes', 'no'],
+                    ['support', '+5511999999999', '10987654321', PhoneCommandsTestHandler::class, 'own', 'yes', 'yes', 'no'],
                 ]
             )
             ->doesntExpectOutputToContain('EAAB.secret')
@@ -213,3 +213,81 @@ class PhoneCommandsTestFlowHandler implements FlowHandlerInterface
         return FlowResponse::screen('DONE');
     }
 }
+
+describe('phone settings flags', function () {
+    it('sets display name, toggles and processing options on add', function () {
+        $this->artisan('whatsapp:phone:add', addPhoneOptions([
+            '--display-name' => 'Fornecedores',
+            '--transcription' => true,
+            '--no-auto-typing' => true,
+            '--no-auto-download-media' => true,
+            '--processing-mode' => 'immediate',
+            '--batch-max-messages' => '20',
+        ]))->assertSuccessful();
+
+        $phone = WhatsAppPhone::where('key', 'support')->first();
+
+        expect($phone->display_name)->toBe('Fornecedores')
+            ->and($phone->transcription_enabled)->toBeTrue()
+            ->and($phone->auto_typing_enabled)->toBeFalse()
+            ->and($phone->auto_download_media)->toBeFalse()
+            ->and($phone->processing_mode)->toBe('immediate')
+            ->and($phone->batch_max_messages)->toBe(20);
+    });
+
+    it('keeps model defaults on add when the flags are omitted', function () {
+        $this->artisan('whatsapp:phone:add', addPhoneOptions())->assertSuccessful();
+
+        $phone = WhatsAppPhone::where('key', 'support')->first();
+
+        expect($phone->transcription_enabled)->toBeFalse()
+            ->and($phone->auto_typing_enabled)->toBeTrue()
+            ->and($phone->processing_mode)->toBe('batch');
+    });
+
+    it('flips toggles both ways on update and leaves the rest alone', function () {
+        $this->artisan('whatsapp:phone:add', addPhoneOptions(['--transcription' => true]))->assertSuccessful();
+
+        $this->artisan('whatsapp:phone:update', [
+            'key' => 'support',
+            '--no-transcription' => true,
+            '--no-auto-typing' => true,
+        ])->assertSuccessful();
+
+        $phone = WhatsAppPhone::where('key', 'support')->first();
+
+        expect($phone->transcription_enabled)->toBeFalse()
+            ->and($phone->auto_typing_enabled)->toBeFalse()
+            ->and($phone->auto_download_media)->toBeTrue();
+
+        $this->artisan('whatsapp:phone:update', ['key' => 'support', '--auto-typing' => true])->assertSuccessful();
+
+        expect($phone->refresh()->auto_typing_enabled)->toBeTrue();
+    });
+
+    it('rejects both sides of a toggle', function () {
+        $this->artisan('whatsapp:phone:add', addPhoneOptions(['--transcription' => true, '--no-transcription' => true]))
+            ->assertFailed();
+
+        expect(WhatsAppPhone::count())->toBe(0);
+    });
+
+    it('rejects an unknown processing mode', function () {
+        $this->artisan('whatsapp:phone:add', addPhoneOptions(['--processing-mode' => 'later']))->assertFailed();
+    });
+
+    it('rejects a non-positive batch max', function () {
+        $this->artisan('whatsapp:phone:add', addPhoneOptions(['--batch-max-messages' => '0']))->assertFailed();
+    });
+
+    it('shows typing and transcription in the list', function () {
+        $this->artisan('whatsapp:phone:add', addPhoneOptions(['--no-auto-typing' => true]))->assertSuccessful();
+
+        $this->artisan('whatsapp:phone:list')
+            ->expectsTable(
+                ['Key', 'Number', 'Phone ID', 'Handler', 'Token', 'Active', 'Typing', 'Transcription'],
+                [['support', '+5511999999999', '10987654321', '-', 'app-wide', 'yes', 'no', 'no']],
+            )
+            ->assertSuccessful();
+    });
+});

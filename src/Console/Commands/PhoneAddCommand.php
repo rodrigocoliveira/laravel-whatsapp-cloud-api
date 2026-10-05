@@ -17,6 +17,15 @@ class PhoneAddCommand extends PhoneCommand
                             {--handler= : Class implementing MessageHandlerInterface}
                             {--flow-handler= : Default class implementing FlowHandlerInterface for flows sent from this phone}
                             {--batch-window= : Seconds to wait before processing a batch}
+                            {--display-name= : Name shown for this number, e.g. in an inbox}
+                            {--transcription : Transcribe inbound audio}
+                            {--no-transcription : Do not transcribe inbound audio}
+                            {--auto-typing : Send a typing indicator and read receipt on every inbound message}
+                            {--no-auto-typing : Do not send the automatic typing indicator}
+                            {--auto-download-media : Download inbound media automatically}
+                            {--no-auto-download-media : Do not download inbound media automatically}
+                            {--processing-mode= : batch or immediate}
+                            {--batch-max-messages= : Max messages per batch}
                             {--inactive : Register the phone as inactive}';
 
     protected $description = 'Register a WhatsApp phone number';

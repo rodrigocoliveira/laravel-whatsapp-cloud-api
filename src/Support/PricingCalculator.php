@@ -26,6 +26,29 @@ class PricingCalculator
     }
 
     /**
+     * Cost of a message given Meta's billing classification.
+     *
+     * 0.0 for free types and non-billable messages; null when pricing has not
+     * arrived yet or no rate is configured for the recipient and category.
+     */
+    public function costFor(string $recipient, ?bool $billable, ?string $category, ?string $type): ?float
+    {
+        if (str_starts_with((string) $type, 'free_')) {
+            return 0.0;
+        }
+
+        if ($billable === null) {
+            return null;
+        }
+
+        if ($billable === false) {
+            return 0.0;
+        }
+
+        return $this->rateFor($recipient, $category);
+    }
+
+    /**
      * Resolve the per-message rate for a recipient and billing category.
      *
      * The longest dial-code prefix matching the recipient wins; the `default`

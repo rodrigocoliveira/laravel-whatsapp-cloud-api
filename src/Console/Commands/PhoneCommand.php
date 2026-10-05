@@ -62,6 +62,44 @@ abstract class PhoneCommand extends Command
             $attributes['batch_window_seconds'] = (int) $window;
         }
 
+        if (($displayName = $this->option('display-name')) !== null) {
+            $attributes['display_name'] = $displayName;
+        }
+
+        foreach (['transcription' => 'transcription_enabled', 'auto-typing' => 'auto_typing_enabled', 'auto-download-media' => 'auto_download_media'] as $option => $column) {
+            if ($this->option($option) && $this->option("no-{$option}")) {
+                $this->error("Pass either --{$option} or --no-{$option}, not both.");
+
+                return null;
+            }
+
+            if ($this->option($option)) {
+                $attributes[$column] = true;
+            } elseif ($this->option("no-{$option}")) {
+                $attributes[$column] = false;
+            }
+        }
+
+        if (($mode = $this->option('processing-mode')) !== null) {
+            if (! in_array($mode, ['batch', 'immediate'], true)) {
+                $this->error("--processing-mode must be batch or immediate, got '{$mode}'.");
+
+                return null;
+            }
+
+            $attributes['processing_mode'] = $mode;
+        }
+
+        if (($max = $this->option('batch-max-messages')) !== null) {
+            if (! ctype_digit((string) $max) || (int) $max < 1) {
+                $this->error('--batch-max-messages must be a positive integer.');
+
+                return null;
+            }
+
+            $attributes['batch_max_messages'] = (int) $max;
+        }
+
         if ($this->input->hasParameterOption('--token')) {
             $attributes['access_token'] = $this->resolveToken();
         }

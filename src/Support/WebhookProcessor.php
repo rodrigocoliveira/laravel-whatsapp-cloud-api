@@ -304,7 +304,7 @@ class WebhookProcessor
                 break;
         }
 
-        $message->update(array_merge($updates, $this->extractPricing($statusData)));
+        $message->update(array_merge($updates, $this->extractPricing($statusData, $message)));
 
         // Fire appropriate event only if status actually changed
         if ($shouldFireEvent) {
@@ -331,12 +331,13 @@ class WebhookProcessor
      *
      * Meta includes `pricing` and `conversation` on outbound status webhooks
      * (sent/delivered/read). The monetary amount is never included; only the
-     * billing category, which the app maps to a rate card.
+     * billing category, which is priced against the rate card and frozen on
+     * the message.
      *
      * @param  array<string, mixed>  $statusData
      * @return array<string, mixed>
      */
-    protected function extractPricing(array $statusData): array
+    protected function extractPricing(array $statusData, WhatsAppMessage $message): array
     {
         $updates = [];
 
@@ -348,6 +349,15 @@ class WebhookProcessor
             $updates['pricing_model'] = $pricing['pricing_model'] ?? null;
             $updates['pricing_category'] = $pricing['category'] ?? null;
             $updates['pricing_type'] = $pricing['type'] ?? null;
+
+            $calculator = app(PricingCalculator::class);
+            $updates['cost'] = $calculator->costFor(
+                $message->to,
+                $updates['pricing_billable'] ?? $message->pricing_billable,
+                $updates['pricing_category'],
+                $updates['pricing_type'],
+            );
+            $updates['cost_currency'] = $updates['cost'] === null ? null : $calculator->currency();
         }
 
         $conversation = $statusData['conversation'] ?? null;

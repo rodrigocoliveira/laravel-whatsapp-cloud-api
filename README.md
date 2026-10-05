@@ -81,11 +81,22 @@ php artisan whatsapp:phone:update support --token
 php artisan whatsapp:phone:list
 ```
 
+Both commands also set the per-phone behaviour: `--display-name=`, `--processing-mode=batch|immediate`,
+`--batch-max-messages=`, and the toggles `--transcription`/`--no-transcription`,
+`--auto-typing`/`--no-auto-typing` and `--auto-download-media`/`--no-auto-download-media`.
+Omitted flags keep the model default on `add`. Turn `--no-auto-typing` on when your handler sends
+its own typing indicator, since auto typing fires on every inbound message before any handler runs:
+
+```bash
+php artisan whatsapp:phone:add suppliers --phone-id=... --phone-number=+5511988887777 \
+    --business-account-id=... --display-name="Fornecedores" --transcription --no-auto-typing
+```
+
 `update` only touches the options you pass (`--phone-id`, `--phone-number`, `--business-account-id`,
-`--token`, `--handler`, `--flow-handler`, `--batch-window`, `--active`, `--inactive`); `--handler`
+`--token`, `--handler`, `--flow-handler`, `--batch-window`, the settings above, `--active`, `--inactive`); `--handler`
 is checked to implement `MessageHandlerInterface` and `--flow-handler` to implement
 `FlowHandlerInterface` at registration time; `list` shows whether a phone carries its
-own token but never the token itself.
+own token (never the token itself) and whether typing and transcription are on.
 
 A phone's own token is encrypted at rest with your `APP_KEY`; `$phone->access_token` always reads it
 back decrypted, and the token is hidden from `toArray()`/`toJson()`. Tokens stored in plaintext by earlier versions keep working and are encrypted the
@@ -662,6 +673,16 @@ E.164 dial-code prefix (longest match wins, `default` as fallback):
 ],
 ```
 
+When a status webhook carries pricing, the cost is computed against the rate card and
+frozen on the message (`cost`, `cost_currency`), so later rate card changes do not
+rewrite history. Messages without a frozen cost fall back to the current rate card.
+
+The cost is the **list (tier 1) rate**, an upper bound. Meta discounts utility and
+authentication by monthly volume tiers counted across the whole business portfolio,
+and webhooks do not report the tier, so the actual charge can be lower. Keep
+`pricing.currency` and the rates in your WABA's billing currency (e.g. the BRL rate
+card for a BRL WABA); Meta does not convert between them.
+
 Then read the estimate on any message:
 
 ```php
@@ -670,11 +691,10 @@ $message->estimatedCost();  // 0.0625, 0.0 for non-billable or free_* types, or 
 
 // Monthly spend per category for one phone
 WhatsAppMessage::where('whatsapp_phone_id', $phone->id)
-    ->where('pricing_billable', true)
     ->whereBetween('sent_at', [$start, $end])
-    ->get()
     ->groupBy('pricing_category')
-    ->map(fn ($messages) => $messages->sum->estimatedCost());
+    ->selectRaw('pricing_category, sum(cost) as total')
+    ->pluck('total', 'pricing_category');
 ```
 
 Since 2026-10-01 Meta bills **service messages** (free-form replies inside the 24h

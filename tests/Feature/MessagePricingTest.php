@@ -171,3 +171,44 @@ it('keeps stored pricing when a later status webhook omits it', function () {
         ->and($message->pricing_billable)->toBeTrue()
         ->and($message->pricing_category)->toBe('marketing');
 });
+
+it('freezes the estimated cost on the message when pricing arrives', function () {
+    config()->set('whatsapp.pricing.currency', 'USD');
+    config()->set('whatsapp.pricing.rates', ['55' => ['marketing' => 0.0625]]);
+
+    $message = createOutboundMessage('wamid.frozen1', '+5511999999999');
+
+    postStatus($this, 'wamid.frozen1', 'sent', [
+        'pricing' => ['billable' => true, 'pricing_model' => 'PMP', 'category' => 'marketing', 'type' => 'regular'],
+    ]);
+
+    config()->set('whatsapp.pricing.rates', ['55' => ['marketing' => 0.99]]);
+    $message->refresh();
+
+    expect($message->cost)->toBe(0.0625)
+        ->and($message->cost_currency)->toBe('USD')
+        ->and($message->estimatedCost())->toBe(0.0625);
+});
+
+it('freezes zero cost for free pricing types', function () {
+    $message = createOutboundMessage('wamid.frozen2', '+5511999999999');
+
+    postStatus($this, 'wamid.frozen2', 'sent', [
+        'pricing' => ['billable' => false, 'pricing_model' => 'PMP', 'category' => 'service', 'type' => 'free_customer_service'],
+    ]);
+
+    expect($message->refresh()->cost)->toBe(0.0);
+});
+
+it('leaves cost null when no rate is configured for the category', function () {
+    config()->set('whatsapp.pricing.rates', []);
+
+    $message = createOutboundMessage('wamid.frozen3', '+5511999999999');
+
+    postStatus($this, 'wamid.frozen3', 'sent', [
+        'pricing' => ['billable' => true, 'pricing_model' => 'PMP', 'category' => 'marketing', 'type' => 'regular'],
+    ]);
+
+    expect($message->refresh()->cost)->toBeNull()
+        ->and($message->cost_currency)->toBeNull();
+});

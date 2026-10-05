@@ -24,7 +24,7 @@ class PhoneListCommand extends Command
         }
 
         $this->table(
-            ['Key', 'Number', 'Phone ID', 'Handler', 'Token', 'Active'],
+            ['Key', 'Number', 'Phone ID', 'Handler', 'Token', 'Active', 'Typing', 'Transcription'],
             $phones->map(fn (WhatsAppPhone $phone) => [
                 $phone->key,
                 $phone->phone_number,
@@ -32,6 +32,8 @@ class PhoneListCommand extends Command
                 $phone->handler ?? '-',
                 $phone->getRawOriginal('access_token') !== null ? 'own' : 'app-wide',
                 $phone->is_active ? 'yes' : 'no',
+                $phone->auto_typing_enabled ? 'yes' : 'no',
+                $phone->transcription_enabled ? 'yes' : 'no',
             ])->all()
         );
 
