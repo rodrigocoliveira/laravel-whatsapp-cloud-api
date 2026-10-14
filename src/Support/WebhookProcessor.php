@@ -381,18 +381,25 @@ class WebhookProcessor
      */
     protected function getOrCreateConversation(WhatsAppPhone $phone, string $contactPhone, ?array $contactData): WhatsAppConversation
     {
-        return WhatsAppConversation::firstOrCreate(
-            [
+        $conversation = WhatsAppConversation::findForContact($phone->id, $contactPhone);
+
+        if ($conversation === null) {
+            return WhatsAppConversation::create([
                 'whatsapp_phone_id' => $phone->id,
                 'contact_phone' => $contactPhone,
-            ],
-            [
                 'contact_name' => $contactData['profile']['name'] ?? null,
                 'last_message_at' => now(),
                 'last_inbound_message_at' => now(),
                 'status' => WhatsAppConversation::STATUS_ACTIVE,
-            ]
-        );
+            ]);
+        }
+
+        // The inbound wa_id is the form Meta knows; adopt it over a BR 9th-digit variant.
+        if ($conversation->contact_phone !== $contactPhone) {
+            $conversation->update(['contact_phone' => $contactPhone]);
+        }
+
+        return $conversation;
     }
 
     /**

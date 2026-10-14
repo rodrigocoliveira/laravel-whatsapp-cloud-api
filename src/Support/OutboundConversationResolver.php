@@ -17,16 +17,13 @@ class OutboundConversationResolver
 {
     public static function resolve(WhatsAppPhone $phone, string $to, ?WhatsAppConversation $conversation = null): WhatsAppConversation
     {
-        $conversation ??= WhatsAppConversation::firstOrCreate(
-            [
+        $conversation ??= WhatsAppConversation::findForContact($phone->id, $to)
+            ?? WhatsAppConversation::create([
                 'whatsapp_phone_id' => $phone->id,
                 'contact_phone' => PhoneNumberHelper::normalize($to),
-            ],
-            [
                 'last_message_at' => now(),
                 'status' => WhatsAppConversation::STATUS_ACTIVE,
-            ]
-        );
+            ]);
 
         $conversation->update(['last_message_at' => now()]);
 
