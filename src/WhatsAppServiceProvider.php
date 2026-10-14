@@ -12,6 +12,7 @@ use Multek\LaravelWhatsAppCloud\Client\WhatsAppClientInterface;
 use Multek\LaravelWhatsAppCloud\Console\Commands\FlowKeyCommand;
 use Multek\LaravelWhatsAppCloud\Console\Commands\FlowTestCommand;
 use Multek\LaravelWhatsAppCloud\Console\Commands\InstallCommand;
+use Multek\LaravelWhatsAppCloud\Console\Commands\MergeBrDuplicateConversationsCommand;
 use Multek\LaravelWhatsAppCloud\Console\Commands\PhoneAddCommand;
 use Multek\LaravelWhatsAppCloud\Console\Commands\PhoneListCommand;
 use Multek\LaravelWhatsAppCloud\Console\Commands\PhoneUpdateCommand;
@@ -208,6 +209,7 @@ class WhatsAppServiceProvider extends ServiceProvider
                 PhoneAddCommand::class,
                 PhoneUpdateCommand::class,
                 PhoneListCommand::class,
+                MergeBrDuplicateConversationsCommand::class,
             ]);
         }
     }

@@ -986,6 +986,10 @@ php artisan whatsapp:sync-flows
 # Process stale/stuck batches (runs automatically every 5 min)
 php artisan whatsapp:process-stale-batches
 
+# Merge conversations split by the Brazilian 9th digit into the row holding Meta's wa_id
+# (new messages already resolve to one conversation; this cleans up older pairs)
+php artisan whatsapp:merge-br-duplicate-conversations --dry-run
+
 # Generate the RSA key pair for endpoint-backed Flows
 php artisan whatsapp:flow-key generate
 

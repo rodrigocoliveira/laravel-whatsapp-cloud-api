@@ -52,6 +52,35 @@ class PhoneNumberHelper
     }
 
     /**
+     * Normalized forms under which the same contact may be stored.
+     *
+     * Meta delivers Brazilian mobile wa_ids without the 9th digit (55 DD 8 digits)
+     * while apps usually send with it (55 DD 9 8 digits). Only mobiles (subscriber
+     * starting 6-9) get the alternate form; landlines and non-BR numbers do not.
+     *
+     * @return list<string>
+     *
+     * @example
+     * PhoneNumberHelper::variants('5582991111097') // ['+5582991111097', '+558291111097']
+     * PhoneNumberHelper::variants('558233334444')  // ['+558233334444']
+     */
+    public static function variants(string $phone): array
+    {
+        $digits = self::toDigits($phone);
+        $normalized = self::normalize($phone);
+
+        if (preg_match('/^55(\d{2})9([6-9]\d{7})$/', $digits, $m)) {
+            return [$normalized, '+55'.$m[1].$m[2]];
+        }
+
+        if (preg_match('/^55(\d{2})([6-9]\d{7})$/', $digits, $m)) {
+            return [$normalized, '+55'.$m[1].'9'.$m[2]];
+        }
+
+        return [$normalized];
+    }
+
+    /**
      * Compare two phone numbers for equality (ignoring formatting).
      *
      * @param  string  $phone1  First phone number

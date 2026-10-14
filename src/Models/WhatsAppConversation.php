@@ -72,6 +72,22 @@ class WhatsAppConversation extends Model
     /**
      * @return HasMany<WhatsAppMessage, $this>
      */
+    /**
+     * Find a contact's conversation under any of its stored forms (see PhoneNumberHelper::variants),
+     * preferring an exact match.
+     */
+    public static function findForContact(int $phoneId, string $contactPhone): ?self
+    {
+        $variants = PhoneNumberHelper::variants($contactPhone);
+
+        return static::query()
+            ->where('whatsapp_phone_id', $phoneId)
+            ->whereIn('contact_phone', $variants)
+            ->get()
+            ->sortBy(fn (self $c) => array_search($c->contact_phone, $variants, true))
+            ->first();
+    }
+
     public function messages(): HasMany
     {
         return $this->hasMany(WhatsAppMessage::class, 'whatsapp_conversation_id');
