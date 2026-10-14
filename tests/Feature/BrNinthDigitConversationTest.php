@@ -99,3 +99,16 @@ it('merges existing duplicate pairs into the inbound wa_id row', function () {
         ->and($kept->contact_name)->toBe('Fornecedor')
         ->and($kept->last_message_at->isToday())->toBeTrue();
 });
+
+it('resolves to the exact row without renaming while both variants still exist', function () {
+    foreach (['+5582991111097', '+558291111097'] as $contact) {
+        WhatsAppConversation::create(['whatsapp_phone_id' => $this->phone->id, 'contact_phone' => $contact, 'status' => WhatsAppConversation::STATUS_ACTIVE, 'last_message_at' => now()]);
+    }
+
+    ($this->receive)('558291111097');
+    $sent = app(WhatsAppManager::class)->phone('test')->sendText('5582991111097', 'Oi');
+
+    expect(WhatsAppConversation::pluck('contact_phone')->sort()->values()->all())->toBe(['+558291111097', '+5582991111097'])
+        ->and(WhatsAppMessage::where('direction', 'inbound')->sole()->conversation->contact_phone)->toBe('+558291111097')
+        ->and($sent->conversation->contact_phone)->toBe('+5582991111097');
+});

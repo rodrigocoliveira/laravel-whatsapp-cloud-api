@@ -70,9 +70,6 @@ class WhatsAppConversation extends Model
     }
 
     /**
-     * @return HasMany<WhatsAppMessage, $this>
-     */
-    /**
      * Find a contact's conversation under any of its stored forms (see PhoneNumberHelper::variants),
      * preferring an exact match.
      */
@@ -88,6 +85,9 @@ class WhatsAppConversation extends Model
             ->first();
     }
 
+    /**
+     * @return HasMany<WhatsAppMessage, $this>
+     */
     public function messages(): HasMany
     {
         return $this->hasMany(WhatsAppMessage::class, 'whatsapp_conversation_id');
