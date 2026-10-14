@@ -603,6 +603,29 @@ foreach ($context->getCompletedFlows() as $session) {
 }
 ```
 
+### Brazilian 9th Digit
+
+Meta delivers Brazilian mobile `wa_id`s without the 9th digit (`558291111097`) while apps usually
+store them with it (`5582991111097`). The package resolves both forms to one conversation and,
+once an inbound message arrives, keeps Meta's `wa_id` as `contact_phone`. Landlines (subscriber
+starting 2-5) and non-BR numbers are never matched across forms.
+
+To match a contact under either form in your own queries:
+
+```php
+use Multek\LaravelWhatsAppCloud\Support\PhoneNumberHelper;
+
+PhoneNumberHelper::variants('5582991111097'); // ['+5582991111097', '+558291111097']
+
+WhatsAppConversation::where('whatsapp_phone_id', $phone->id)
+    ->forContact('5582991111097')
+    ->latest()
+    ->first();
+```
+
+Conversations split before this was handled can be merged with
+`php artisan whatsapp:merge-br-duplicate-conversations` (see Console Commands).
+
 ### Listening to Events
 
 ```php

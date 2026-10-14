@@ -112,3 +112,12 @@ it('resolves to the exact row without renaming while both variants still exist',
         ->and(WhatsAppMessage::where('direction', 'inbound')->sole()->conversation->contact_phone)->toBe('+558291111097')
         ->and($sent->conversation->contact_phone)->toBe('+5582991111097');
 });
+
+it('scopes conversations to a contact under either BR mobile form only', function () {
+    foreach (['+558291111097', '+5582933334444'] as $contact) {
+        WhatsAppConversation::create(['whatsapp_phone_id' => $this->phone->id, 'contact_phone' => $contact, 'status' => WhatsAppConversation::STATUS_ACTIVE, 'last_message_at' => now()]);
+    }
+
+    expect(WhatsAppConversation::forContact('5582991111097')->pluck('contact_phone')->all())->toBe(['+558291111097'])
+        ->and(WhatsAppConversation::forContact('558233334444')->exists())->toBeFalse();
+});

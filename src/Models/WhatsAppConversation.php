@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Multek\LaravelWhatsAppCloud\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -70,6 +71,16 @@ class WhatsAppConversation extends Model
     }
 
     /**
+     * Match a contact under any of its stored forms (BR mobiles with or without the 9th digit).
+     *
+     * @param  Builder<self>  $query
+     */
+    public function scopeForContact(Builder $query, string $contactPhone): void
+    {
+        $query->whereIn('contact_phone', PhoneNumberHelper::variants($contactPhone));
+    }
+
+    /**
      * Find a contact's conversation under any of its stored forms (see PhoneNumberHelper::variants),
      * preferring an exact match.
      */
@@ -79,7 +90,7 @@ class WhatsAppConversation extends Model
 
         return static::query()
             ->where('whatsapp_phone_id', $phoneId)
-            ->whereIn('contact_phone', $variants)
+            ->forContact($contactPhone)
             ->get()
             ->sortBy(fn (self $c) => array_search($c->contact_phone, $variants, true))
             ->first();
