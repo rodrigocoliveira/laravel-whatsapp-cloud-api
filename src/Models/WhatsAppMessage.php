@@ -25,6 +25,7 @@ use Multek\LaravelWhatsAppCloud\DTOs\MessageContent\UnknownContent;
 use Multek\LaravelWhatsAppCloud\DTOs\MessageContent\VideoContent;
 use Multek\LaravelWhatsAppCloud\Events\MessageReady;
 use Multek\LaravelWhatsAppCloud\Jobs\WhatsAppTranscribeAudio;
+use Multek\LaravelWhatsAppCloud\Models\Relations\RepliedToMessage;
 use Multek\LaravelWhatsAppCloud\Support\PhoneNumberHelper;
 use Multek\LaravelWhatsAppCloud\Support\PricingCalculator;
 
@@ -34,6 +35,7 @@ use Multek\LaravelWhatsAppCloud\Support\PricingCalculator;
  * @property int|null $whatsapp_conversation_id
  * @property int|null $whatsapp_message_batch_id
  * @property string $message_id
+ * @property string|null $reply_to_message_id
  * @property string $direction
  * @property string $type
  * @property string $from
@@ -74,6 +76,7 @@ use Multek\LaravelWhatsAppCloud\Support\PricingCalculator;
  * @property-read WhatsAppPhone $phone
  * @property-read WhatsAppConversation|null $conversation
  * @property-read WhatsAppMessageBatch|null $batch
+ * @property-read WhatsAppMessage|null $repliedTo
  */
 class WhatsAppMessage extends Model
 {
@@ -186,6 +189,7 @@ class WhatsAppMessage extends Model
         'whatsapp_conversation_id',
         'whatsapp_message_batch_id',
         'message_id',
+        'reply_to_message_id',
         'direction',
         'type',
         'from',
@@ -259,6 +263,20 @@ class WhatsAppMessage extends Model
     public function batch(): BelongsTo
     {
         return $this->belongsTo(WhatsAppMessageBatch::class, 'whatsapp_message_batch_id', 'id');
+    }
+
+    /**
+     * The message this one quotes, on the same phone; null when it isn't stored locally.
+     */
+    public function repliedTo(): RepliedToMessage
+    {
+        return new RepliedToMessage(
+            $this->newRelatedInstance(self::class)->newQuery(),
+            $this,
+            'reply_to_message_id',
+            'message_id',
+            'repliedTo'
+        );
     }
 
     /**

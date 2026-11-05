@@ -287,7 +287,20 @@ WhatsApp::phone('support')->removeReaction('wamid.HBgL...');
 
 // Reacting to a message that is not stored locally requires the recipient
 WhatsApp::phone('support')->sendReaction('wamid.HBgL...', '👍', to: '+5511999999999');
+
+// Reply to a specific message, quoting it. Works on send() and queue()
+WhatsApp::phone('support')
+    ->to('+5511999999999')
+    ->replyTo('wamid.HBgL...')
+    ->text('Got your quote, thanks')
+    ->send();
 ```
+
+`replyTo()` throws when combined with `reaction()`, because Meta doesn't allow a reaction as a
+contextual reply. A template can be sent with it, but Meta delivers the template without the quoted
+bubble. It also throws for a `pending_` or `unknown_` id, because a queued message has no WhatsApp
+id until its job has sent it. Sending with it needs the package's `WhatsAppClient`, which is what
+`WhatsApp::phone()` always uses.
 
 A sent template's `template_parameters` column records what was sent, in Meta's shape:
 `header` is Meta's header parameter (e.g. `{type: 'document', document: {id, filename}}`),
@@ -425,6 +438,16 @@ foreach ($context->messages as $message) {
         $email = $content->get('email');
         $flowToken = $content->flowToken;
     }
+}
+```
+
+When the contact replies to an earlier message, its wamid is stored in `reply_to_message_id` (also
+set on outbound messages sent with `replyTo()`). The `repliedTo` relation returns that message, or
+`null` when it isn't stored locally, so check the column to tell "not a reply" from "not stored":
+
+```php
+if ($message->reply_to_message_id !== null) {
+    $quoted = $message->repliedTo; // e.g. the PDF the supplier marked
 }
 ```
 

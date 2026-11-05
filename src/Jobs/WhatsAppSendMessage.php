@@ -44,7 +44,7 @@ class WhatsAppSendMessage implements ShouldQueue
         }
 
         $phone = $message->phone;
-        $client = new WhatsAppClient($phone);
+        $client = (new WhatsAppClient($phone))->replyingTo($message->reply_to_message_id);
 
         try {
             $this->uploadStoredMedia($client, $message);

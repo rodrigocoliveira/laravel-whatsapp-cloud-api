@@ -6,6 +6,7 @@ namespace Multek\LaravelWhatsAppCloud\Support;
 
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
+use Multek\LaravelWhatsAppCloud\Client\WhatsAppClient;
 use Multek\LaravelWhatsAppCloud\Client\WhatsAppClientInterface;
 use Multek\LaravelWhatsAppCloud\Events\MessageSent;
 use Multek\LaravelWhatsAppCloud\Exceptions\MessageSendException;
@@ -107,6 +108,8 @@ class MessageBuilder
 
     protected ?string $reactionEmoji = null;
 
+    protected ?string $replyToMessageId = null;
+
     /** @var array<string, mixed> */
     protected array $metadata = [];
 
@@ -145,6 +148,21 @@ class MessageBuilder
     public function metadata(array $metadata): self
     {
         $this->metadata = array_merge($this->metadata, $metadata);
+
+        return $this;
+    }
+
+    /**
+     * Send this message as a contextual reply quoting the given wamid. A reaction can't be
+     * one; a template can, but Meta delivers it without the quoted bubble.
+     */
+    public function replyTo(string $messageId): self
+    {
+        if (Str::startsWith($messageId, ['pending_', 'unknown_'])) {
+            throw new \InvalidArgumentException("Cannot reply to [{$messageId}]: it has no WhatsApp message id yet. Wait until that message has been sent.");
+        }
+
+        $this->replyToMessageId = $messageId;
 
         return $this;
     }
@@ -516,6 +534,8 @@ class MessageBuilder
     {
         $this->ensureRecipient();
         $this->ensureHeaderFileIsTemplate();
+        $this->ensureReplyIsNotReaction();
+        $this->applyReplyToClient();
         $this->uploadMediaFile();
 
         $result = $this->executeApiCall();
@@ -532,6 +552,7 @@ class MessageBuilder
     {
         $this->ensureRecipient();
         $this->ensureHeaderFileIsTemplate();
+        $this->ensureReplyIsNotReaction();
         $this->storeMediaFile();
 
         $message = $this->createPendingMessage();
@@ -670,7 +691,7 @@ class MessageBuilder
             'template_name' => $this->templateName,
             'template_parameters' => $this->buildTemplateParametersForRecord(),
             'metadata' => $this->metadata ?: null,
-        ] + $this->mediaAttributes + $this->templateMediaAttributes());
+        ] + $this->mediaAttributes + $this->templateMediaAttributes() + $this->replyAttributes());
     }
 
     protected function createPendingMessage(): WhatsAppMessage
@@ -690,7 +711,7 @@ class MessageBuilder
             'template_name' => $this->templateName,
             'template_parameters' => $this->buildTemplateParametersForRecord(),
             'metadata' => $this->metadata ?: null,
-        ] + $this->mediaAttributes + $this->templateMediaAttributes());
+        ] + $this->mediaAttributes + $this->templateMediaAttributes() + $this->replyAttributes());
     }
 
     protected function ensureRecipient(): string
@@ -910,6 +931,39 @@ class MessageBuilder
         $mediaId = $this->messageType === 'template' ? $this->template->headerMediaId() : null;
 
         return $mediaId === null ? [] : ['media_id' => $mediaId];
+    }
+
+    /**
+     * Only a reply carries the column, so plain messages keep working while its migration is pending.
+     *
+     * @return array<string, string>
+     */
+    protected function replyAttributes(): array
+    {
+        return $this->replyToMessageId === null ? [] : ['reply_to_message_id' => $this->replyToMessageId];
+    }
+
+    /**
+     * Only send() needs this: a queued message is sent by the job's own client.
+     */
+    protected function applyReplyToClient(): void
+    {
+        if ($this->replyToMessageId === null) {
+            return;
+        }
+
+        if (! $this->client instanceof WhatsAppClient) {
+            throw new \LogicException('Sending with replyTo() needs a WhatsAppClient: WhatsAppClientInterface has no way to send a message context.');
+        }
+
+        $this->client = $this->client->replyingTo($this->replyToMessageId);
+    }
+
+    protected function ensureReplyIsNotReaction(): void
+    {
+        if ($this->messageType === 'reaction' && $this->replyToMessageId !== null) {
+            throw new \InvalidArgumentException('A reaction cannot be sent as a contextual reply: remove replyTo() or reaction().');
+        }
     }
 
     protected function ensureHeaderFileIsTemplate(): void
