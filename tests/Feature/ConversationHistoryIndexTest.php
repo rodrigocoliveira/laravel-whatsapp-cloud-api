@@ -26,7 +26,7 @@ it('drops the index on rollback', function () {
     expect(Schema::hasIndex('whatsapp_messages', 'messages_conversation_created_id_idx'))->toBeFalse();
 });
 
-it('replaces an index left behind by a failed build', function () {
+it('keeps an index that already exists when it runs again', function () {
     conversationHistoryIndexMigration()->up();
 
     expect(Schema::hasIndex('whatsapp_messages', 'messages_conversation_created_id_idx'))->toBeTrue();

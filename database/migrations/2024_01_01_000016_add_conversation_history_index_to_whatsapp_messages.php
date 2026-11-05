@@ -19,11 +19,20 @@ return new class extends Migration
 
     public function up(): void
     {
+        $connection = Schema::getConnection();
+
         // A failed concurrent build leaves an INVALID index that would block the retry
+        if ($connection->getDriverName() === 'pgsql' && $connection->selectOne(
+            'select 1 from pg_index i join pg_class c on c.oid = i.indexrelid '
+            .'where c.relname = ? and not i.indisvalid and pg_table_is_visible(c.oid)',
+            [self::INDEX]
+        )) {
+            $connection->statement('drop index concurrently '.self::INDEX);
+        }
+
+        // Already built by hand, or by a run that died before being recorded
         if (Schema::hasIndex('whatsapp_messages', self::INDEX)) {
-            Schema::table('whatsapp_messages', function (Blueprint $table) {
-                $table->dropIndex(self::INDEX);
-            });
+            return;
         }
 
         Schema::table('whatsapp_messages', function (Blueprint $table) {
