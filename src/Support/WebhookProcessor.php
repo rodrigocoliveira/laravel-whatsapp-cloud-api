@@ -152,6 +152,8 @@ class WebhookProcessor
             [
                 'whatsapp_phone_id' => $phone->id,
                 'whatsapp_conversation_id' => $conversation->id,
+                // Forwarded messages carry a context with no id.
+                'reply_to_message_id' => $messageData['context']['id'] ?? null,
                 'direction' => WhatsAppMessage::DIRECTION_INBOUND,
                 'type' => $type,
                 'from' => $from,

@@ -20,11 +20,25 @@ class WhatsAppClient implements WhatsAppClientInterface
 
     protected string $apiVersion;
 
+    protected ?string $replyToMessageId = null;
+
     public function __construct(
         protected WhatsAppPhone $phone,
     ) {
         $this->baseUrl = config('whatsapp.api_base_url', 'https://graph.facebook.com');
         $this->apiVersion = config('whatsapp.api_version', 'v24.0');
+    }
+
+    /**
+     * A copy of this client whose messages quote the given wamid. A copy, because the
+     * manager shares one client per phone and the quote must not reach its next message.
+     */
+    public function replyingTo(?string $messageId): static
+    {
+        $client = clone $this;
+        $client->replyToMessageId = $messageId;
+
+        return $client;
     }
 
     /**
@@ -692,6 +706,10 @@ class WhatsAppClient implements WhatsAppClientInterface
      */
     protected function sendMessage(array $payload): array
     {
+        if ($this->replyToMessageId !== null) {
+            $payload['context'] = ['message_id' => $this->replyToMessageId];
+        }
+
         $this->logOutgoing($payload);
 
         $response = $this->http()->post($this->getMessagesEndpoint(), $payload);

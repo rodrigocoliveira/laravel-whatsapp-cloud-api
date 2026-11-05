@@ -6,6 +6,7 @@ namespace Multek\LaravelWhatsAppCloud\Support;
 
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
+use Multek\LaravelWhatsAppCloud\Client\WhatsAppClient;
 use Multek\LaravelWhatsAppCloud\Client\WhatsAppClientInterface;
 use Multek\LaravelWhatsAppCloud\Events\MessageSent;
 use Multek\LaravelWhatsAppCloud\Exceptions\MessageSendException;
@@ -107,6 +108,8 @@ class MessageBuilder
 
     protected ?string $reactionEmoji = null;
 
+    protected ?string $replyToMessageId = null;
+
     /** @var array<string, mixed> */
     protected array $metadata = [];
 
@@ -145,6 +148,22 @@ class MessageBuilder
     public function metadata(array $metadata): self
     {
         $this->metadata = array_merge($this->metadata, $metadata);
+
+        return $this;
+    }
+
+    /**
+     * Send this message as a contextual reply quoting the given wamid. A reaction can't be
+     * one; a template can, but Meta delivers it without the quoted bubble.
+     */
+    public function replyTo(string $messageId): self
+    {
+        if (! $this->client instanceof WhatsAppClient) {
+            throw new \LogicException('replyTo() needs a WhatsAppClient: WhatsAppClientInterface has no way to send a message context.');
+        }
+
+        $this->client = $this->client->replyingTo($messageId);
+        $this->replyToMessageId = $messageId;
 
         return $this;
     }
@@ -516,6 +535,7 @@ class MessageBuilder
     {
         $this->ensureRecipient();
         $this->ensureHeaderFileIsTemplate();
+        $this->ensureReplyIsNotReaction();
         $this->uploadMediaFile();
 
         $result = $this->executeApiCall();
@@ -532,6 +552,7 @@ class MessageBuilder
     {
         $this->ensureRecipient();
         $this->ensureHeaderFileIsTemplate();
+        $this->ensureReplyIsNotReaction();
         $this->storeMediaFile();
 
         $message = $this->createPendingMessage();
@@ -658,6 +679,7 @@ class MessageBuilder
             'whatsapp_phone_id' => $this->phone->id,
             'whatsapp_conversation_id' => $this->resolveConversation()->id,
             'message_id' => $messageId,
+            'reply_to_message_id' => $this->replyToMessageId,
             'direction' => WhatsAppMessage::DIRECTION_OUTBOUND,
             'type' => $this->resolveMessageTypeForRecord(),
             'from' => $this->phone->phone_number,
@@ -679,6 +701,7 @@ class MessageBuilder
             'whatsapp_phone_id' => $this->phone->id,
             'whatsapp_conversation_id' => $this->resolveConversation()->id,
             'message_id' => 'pending_'.uniqid(),
+            'reply_to_message_id' => $this->replyToMessageId,
             'direction' => WhatsAppMessage::DIRECTION_OUTBOUND,
             'type' => $this->resolveMessageTypeForRecord(),
             'from' => $this->phone->phone_number,
@@ -910,6 +933,13 @@ class MessageBuilder
         $mediaId = $this->messageType === 'template' ? $this->template->headerMediaId() : null;
 
         return $mediaId === null ? [] : ['media_id' => $mediaId];
+    }
+
+    protected function ensureReplyIsNotReaction(): void
+    {
+        if ($this->messageType === 'reaction' && $this->replyToMessageId !== null) {
+            throw new \InvalidArgumentException('A reaction cannot be sent as a contextual reply: remove replyTo() or reaction().');
+        }
     }
 
     protected function ensureHeaderFileIsTemplate(): void
