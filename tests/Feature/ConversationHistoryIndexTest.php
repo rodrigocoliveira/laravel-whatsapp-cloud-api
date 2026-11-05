@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Schema;
 
 function conversationHistoryIndexMigration(): object
 {
-    return require __DIR__.'/../../database/migrations/2024_01_01_000016_add_conversation_history_index_to_whatsapp_messages.php';
+    return require __DIR__.'/../../database/migrations/2024_01_01_000017_add_conversation_history_index_to_whatsapp_messages.php';
 }
 
 it('indexes messages by conversation, created_at and id, in that order', function () {
