@@ -298,7 +298,9 @@ WhatsApp::phone('support')
 
 `replyTo()` throws when combined with `reaction()`, because Meta doesn't allow a reaction as a
 contextual reply. A template can be sent with it, but Meta delivers the template without the quoted
-bubble. It needs the package's `WhatsAppClient`, which is what `WhatsApp::phone()` always uses.
+bubble. It also throws for a `pending_` or `unknown_` id, because a queued message has no WhatsApp
+id until its job has sent it. Sending with it needs the package's `WhatsAppClient`, which is what
+`WhatsApp::phone()` always uses.
 
 A sent template's `template_parameters` column records what was sent, in Meta's shape:
 `header` is Meta's header parameter (e.g. `{type: 'document', document: {id, filename}}`),

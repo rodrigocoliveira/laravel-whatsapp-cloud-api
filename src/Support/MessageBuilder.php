@@ -158,11 +158,10 @@ class MessageBuilder
      */
     public function replyTo(string $messageId): self
     {
-        if (! $this->client instanceof WhatsAppClient) {
-            throw new \LogicException('replyTo() needs a WhatsAppClient: WhatsAppClientInterface has no way to send a message context.');
+        if (Str::startsWith($messageId, ['pending_', 'unknown_'])) {
+            throw new \InvalidArgumentException("Cannot reply to [{$messageId}]: it has no WhatsApp message id yet. Wait until that message has been sent.");
         }
 
-        $this->client = $this->client->replyingTo($messageId);
         $this->replyToMessageId = $messageId;
 
         return $this;
@@ -536,6 +535,7 @@ class MessageBuilder
         $this->ensureRecipient();
         $this->ensureHeaderFileIsTemplate();
         $this->ensureReplyIsNotReaction();
+        $this->applyReplyToClient();
         $this->uploadMediaFile();
 
         $result = $this->executeApiCall();
@@ -679,7 +679,6 @@ class MessageBuilder
             'whatsapp_phone_id' => $this->phone->id,
             'whatsapp_conversation_id' => $this->resolveConversation()->id,
             'message_id' => $messageId,
-            'reply_to_message_id' => $this->replyToMessageId,
             'direction' => WhatsAppMessage::DIRECTION_OUTBOUND,
             'type' => $this->resolveMessageTypeForRecord(),
             'from' => $this->phone->phone_number,
@@ -692,7 +691,7 @@ class MessageBuilder
             'template_name' => $this->templateName,
             'template_parameters' => $this->buildTemplateParametersForRecord(),
             'metadata' => $this->metadata ?: null,
-        ] + $this->mediaAttributes + $this->templateMediaAttributes());
+        ] + $this->mediaAttributes + $this->templateMediaAttributes() + $this->replyAttributes());
     }
 
     protected function createPendingMessage(): WhatsAppMessage
@@ -701,7 +700,6 @@ class MessageBuilder
             'whatsapp_phone_id' => $this->phone->id,
             'whatsapp_conversation_id' => $this->resolveConversation()->id,
             'message_id' => 'pending_'.uniqid(),
-            'reply_to_message_id' => $this->replyToMessageId,
             'direction' => WhatsAppMessage::DIRECTION_OUTBOUND,
             'type' => $this->resolveMessageTypeForRecord(),
             'from' => $this->phone->phone_number,
@@ -713,7 +711,7 @@ class MessageBuilder
             'template_name' => $this->templateName,
             'template_parameters' => $this->buildTemplateParametersForRecord(),
             'metadata' => $this->metadata ?: null,
-        ] + $this->mediaAttributes + $this->templateMediaAttributes());
+        ] + $this->mediaAttributes + $this->templateMediaAttributes() + $this->replyAttributes());
     }
 
     protected function ensureRecipient(): string
@@ -933,6 +931,32 @@ class MessageBuilder
         $mediaId = $this->messageType === 'template' ? $this->template->headerMediaId() : null;
 
         return $mediaId === null ? [] : ['media_id' => $mediaId];
+    }
+
+    /**
+     * Only a reply carries the column, so plain messages keep working while its migration is pending.
+     *
+     * @return array<string, string>
+     */
+    protected function replyAttributes(): array
+    {
+        return $this->replyToMessageId === null ? [] : ['reply_to_message_id' => $this->replyToMessageId];
+    }
+
+    /**
+     * Only send() needs this: a queued message is sent by the job's own client.
+     */
+    protected function applyReplyToClient(): void
+    {
+        if ($this->replyToMessageId === null) {
+            return;
+        }
+
+        if (! $this->client instanceof WhatsAppClient) {
+            throw new \LogicException('Sending with replyTo() needs a WhatsAppClient: WhatsAppClientInterface has no way to send a message context.');
+        }
+
+        $this->client = $this->client->replyingTo($this->replyToMessageId);
     }
 
     protected function ensureReplyIsNotReaction(): void

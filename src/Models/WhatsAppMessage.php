@@ -25,6 +25,7 @@ use Multek\LaravelWhatsAppCloud\DTOs\MessageContent\UnknownContent;
 use Multek\LaravelWhatsAppCloud\DTOs\MessageContent\VideoContent;
 use Multek\LaravelWhatsAppCloud\Events\MessageReady;
 use Multek\LaravelWhatsAppCloud\Jobs\WhatsAppTranscribeAudio;
+use Multek\LaravelWhatsAppCloud\Models\Relations\RepliedToMessage;
 use Multek\LaravelWhatsAppCloud\Support\PhoneNumberHelper;
 use Multek\LaravelWhatsAppCloud\Support\PricingCalculator;
 
@@ -266,21 +267,16 @@ class WhatsAppMessage extends Model
 
     /**
      * The message this one quotes, on the same phone; null when it isn't stored locally.
-     *
-     * @return BelongsTo<self, $this>
      */
-    public function repliedTo(): BelongsTo
+    public function repliedTo(): RepliedToMessage
     {
-        $relation = $this->belongsTo(self::class, 'reply_to_message_id', 'message_id');
-
-        // ponytail: an eager load builds this on a blank model, so with() matches by
-        // message_id alone. That column is globally unique, so only a wamid stored under
-        // another phone slips through; override match() if that ever happens.
-        if ($this->exists) {
-            $relation->where('whatsapp_phone_id', $this->whatsapp_phone_id);
-        }
-
-        return $relation;
+        return new RepliedToMessage(
+            $this->newRelatedInstance(self::class)->newQuery(),
+            $this,
+            'reply_to_message_id',
+            'message_id',
+            'repliedTo'
+        );
     }
 
     /**

@@ -2,11 +2,16 @@
 
 declare(strict_types=1);
 
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Client\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Schema;
 use Multek\LaravelWhatsAppCloud\Client\WhatsAppClientInterface;
+use Multek\LaravelWhatsAppCloud\Events\MessageDelivered;
 use Multek\LaravelWhatsAppCloud\Events\MessageFailed;
 use Multek\LaravelWhatsAppCloud\Jobs\WhatsAppSendMessage;
 use Multek\LaravelWhatsAppCloud\Models\WhatsAppMessage;
@@ -23,6 +28,14 @@ beforeEach(function () {
         'key' => 'test',
         'phone_id' => 'test_phone_id',
         'phone_number' => '+15551234567',
+        'business_account_id' => 'test_waba',
+        'is_active' => true,
+    ]);
+
+    $this->otherPhone = fn () => WhatsAppPhone::create([
+        'key' => 'other',
+        'phone_id' => 'other_phone_id',
+        'phone_number' => '+15557654321',
         'business_account_id' => 'test_waba',
         'is_active' => true,
     ]);
@@ -156,11 +169,44 @@ it('refuses replyTo() with reaction(), in either order', function (string $metho
     expect(WhatsAppMessage::count())->toBe(0);
 })->with(['send', 'queue']);
 
-it('refuses replyTo() on a client that cannot send a context', function () {
+it('refuses to send with replyTo() on a client that cannot send a context, before any upload', function () {
+    $client = Mockery::mock(WhatsAppClientInterface::class);
+    $client->shouldNotReceive('uploadMediaContents');
+
+    $builder = (new MessageBuilder($this->phone, $client))->to('5511999999999')->replyTo('wamid.quoted')->document(UploadedFile::fake()->create('quote.pdf'));
+
+    expect(fn () => $builder->send())->toThrow(LogicException::class, 'WhatsAppClient');
+});
+
+it('queues a reply on any client, because the job sends it with its own', function () {
     $client = Mockery::mock(WhatsAppClientInterface::class);
 
-    expect(fn () => (new MessageBuilder($this->phone, $client))->replyTo('wamid.quoted'))
-        ->toThrow(LogicException::class, 'WhatsAppClient');
+    $pending = (new MessageBuilder($this->phone, $client))->to('5511999999999')->replyTo('wamid.quoted')->text('thanks')->queue();
+
+    (new WhatsAppSendMessage($pending))->handle();
+
+    Http::assertSent(fn (Request $request) => $request['context'] === ['message_id' => 'wamid.quoted']);
+});
+
+it('refuses to reply to an id Meta does not know', function (string $messageId) {
+    expect(fn () => ($this->builder)()->replyTo($messageId))
+        ->toThrow(InvalidArgumentException::class, $messageId);
+})->with(['pending_abc', 'unknown_abc']);
+
+it('keeps plain messages working while the column migration is pending', function () {
+    Schema::table('whatsapp_messages', fn (Blueprint $table) => $table->dropColumn('reply_to_message_id'));
+
+    ($this->webhook)(['messages' => [[
+        'id' => 'wamid.in',
+        'from' => '5511999999999',
+        'timestamp' => '1700000000',
+        'type' => 'text',
+        'text' => ['body' => 'hi'],
+    ]]]);
+
+    expect(WhatsAppMessage::firstWhere('message_id', 'wamid.in'))->not->toBeNull()
+        ->and(($this->builder)()->text('sent')->send()->exists)->toBeTrue()
+        ->and(($this->builder)()->text('queued')->queue()->exists)->toBeTrue();
 });
 
 it('resolves repliedTo to the stored message', function () {
@@ -176,15 +222,7 @@ it('returns null from repliedTo when the message is not stored or not a reply', 
 });
 
 it('does not resolve repliedTo to a message stored under another phone', function () {
-    $other = WhatsAppPhone::create([
-        'key' => 'other',
-        'phone_id' => 'other_phone_id',
-        'phone_number' => '+15557654321',
-        'business_account_id' => 'test_waba',
-        'is_active' => true,
-    ]);
-
-    ($this->storeMessage)('wamid.quoted', null, $other);
+    ($this->storeMessage)('wamid.quoted', null, ($this->otherPhone)());
 
     expect(($this->storeMessage)('wamid.reply', 'wamid.quoted')->repliedTo)->toBeNull();
 });
@@ -198,6 +236,84 @@ it('eager loads repliedTo', function () {
 
     expect($messages['wamid.reply']->repliedTo->id)->toBe($original->id)
         ->and($messages['wamid.orphan']->repliedTo)->toBeNull();
+});
+
+it('keeps repliedTo on the same phone through with(), load() and whereHas()', function () {
+    $other = ($this->otherPhone)();
+    $sharedQuote = ($this->storeMessage)('wamid.other', null, $other);
+    $sameQuote = ($this->storeMessage)('wamid.same');
+
+    $crossPhone = ($this->storeMessage)('wamid.cross', 'wamid.other');
+    $samePhone = ($this->storeMessage)('wamid.reply', 'wamid.same');
+    $otherPhoneReply = ($this->storeMessage)('wamid.other_reply', 'wamid.other', $other);
+
+    $messages = WhatsAppMessage::with('repliedTo')->get()->keyBy('message_id');
+
+    expect($messages['wamid.cross']->repliedTo)->toBeNull()
+        ->and($messages['wamid.reply']->repliedTo->id)->toBe($sameQuote->id)
+        ->and($messages['wamid.other_reply']->repliedTo->id)->toBe($sharedQuote->id)
+        ->and($crossPhone->load('repliedTo')->repliedTo)->toBeNull()
+        ->and(WhatsAppMessage::whereHas('repliedTo')->pluck('message_id')->sort()->values()->all())
+        ->toBe(['wamid.other_reply', 'wamid.reply'])
+        ->and(WhatsAppMessage::whereDoesntHave('repliedTo')->whereNotNull('reply_to_message_id')->pluck('message_id')->all())
+        ->toBe(['wamid.cross']);
+});
+
+it('resolves repliedTo on a row selected without its phone column', function () {
+    $original = ($this->storeMessage)('wamid.quoted');
+    ($this->storeMessage)('wamid.reply', 'wamid.quoted');
+
+    $partial = fn () => WhatsAppMessage::select('id', 'reply_to_message_id')->firstWhere('message_id', 'wamid.reply');
+
+    expect($partial()->repliedTo->id)->toBe($original->id)
+        ->and($partial()->load('repliedTo')->repliedTo->id)->toBe($original->id);
+});
+
+it('logs an error the webhook reports with no message id', function () {
+    Log::spy();
+
+    ($this->webhook)(['errors' => [['code' => 131009, 'title' => 'Parameter value is not valid']]]);
+
+    Log::shouldHaveReceived('warning')->once()->withArgs(fn (string $message, array $context) => $context['phone_id'] === 'test_phone_id'
+        && $context['error']['code'] === 131009);
+});
+
+it('does not let a late status undo a later one', function (array $statuses, string $expected) {
+    $message = ($this->builder)()->text('hi')->send();
+
+    foreach ($statuses as $status) {
+        ($this->webhook)(['statuses' => [[
+            'id' => $message->message_id,
+            'status' => $status,
+            'timestamp' => '1700000000',
+            'errors' => [['code' => 131009, 'message' => 'Parameter value is not valid']],
+        ]]]);
+    }
+
+    expect($message->fresh()->delivery_status)->toBe($expected);
+})->with([
+    'sent after failed' => [['failed', 'sent'], 'failed'],
+    'delivered after failed' => [['failed', 'delivered'], 'failed'],
+    'sent after delivered' => [['delivered', 'sent'], 'delivered'],
+    'delivered after read' => [['read', 'delivered'], 'read'],
+    'in order' => [['sent', 'delivered', 'read'], 'read'],
+    'failed after delivered' => [['delivered', 'failed'], 'failed'],
+    'unknown status' => [['sent', 'deleted'], 'deleted'],
+]);
+
+it('still records the timestamp and fires the event of a late status', function () {
+    Event::fake([MessageDelivered::class]);
+
+    $message = ($this->builder)()->text('hi')->send();
+
+    foreach (['read', 'delivered'] as $status) {
+        ($this->webhook)(['statuses' => [['id' => $message->message_id, 'status' => $status, 'timestamp' => '1700000000']]]);
+    }
+
+    expect($message->fresh()->delivered_at)->not->toBeNull()
+        ->and($message->fresh()->delivery_status)->toBe('read');
+
+    Event::assertDispatched(MessageDelivered::class);
 });
 
 it('records a failed reaction reported as a failed status with error 131009', function () {

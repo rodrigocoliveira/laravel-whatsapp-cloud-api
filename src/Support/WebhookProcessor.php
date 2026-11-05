@@ -24,6 +24,16 @@ use Multek\LaravelWhatsAppCloud\Models\WhatsAppPhone;
 class WebhookProcessor
 {
     /**
+     * Meta doesn't guarantee webhook order, so a status only moves a message forward. Failed is final.
+     */
+    protected const DELIVERY_STATUS_ORDER = [
+        WhatsAppMessage::DELIVERY_STATUS_SENT => 1,
+        WhatsAppMessage::DELIVERY_STATUS_DELIVERED => 2,
+        WhatsAppMessage::DELIVERY_STATUS_READ => 3,
+        WhatsAppMessage::DELIVERY_STATUS_FAILED => 4,
+    ];
+
+    /**
      * Process incoming webhook payload.
      *
      * @param  array<string, mixed>  $payload
@@ -92,6 +102,11 @@ class WebhookProcessor
 
         $phone = (new WhatsAppPhone)->newFromBuilder($attributes);
 
+        // System, app or account errors name no message, so there is no row to update
+        foreach ($value['errors'] ?? [] as $error) {
+            Log::warning('WhatsApp webhook reported an error', ['phone_id' => $phoneNumberId, 'error' => $error]);
+        }
+
         // Process messages
         $messages = $value['messages'] ?? [];
         $contacts = $value['contacts'] ?? [];
@@ -152,8 +167,6 @@ class WebhookProcessor
             [
                 'whatsapp_phone_id' => $phone->id,
                 'whatsapp_conversation_id' => $conversation->id,
-                // Forwarded messages carry a context with no id.
-                'reply_to_message_id' => $messageData['context']['id'] ?? null,
                 'direction' => WhatsAppMessage::DIRECTION_INBOUND,
                 'type' => $type,
                 'from' => $from,
@@ -164,7 +177,9 @@ class WebhookProcessor
                 'media_id' => $mediaId,
                 'media_mime_type' => $mimeType,
                 'created_at' => $timestamp ? Carbon::createFromTimestamp((int) $timestamp) : now(),
-            ]
+                // Forwarded messages carry a context with no id. Only a reply sets the column, because
+                // while its migration is pending a failed insert is lost: Meta already got its 200.
+            ] + array_filter(['reply_to_message_id' => $messageData['context']['id'] ?? null])
         );
 
         // If message already existed (duplicate webhook), skip processing
@@ -273,7 +288,8 @@ class WebhookProcessor
             return;
         }
 
-        $updates = ['delivery_status' => $status];
+        $isLate = (self::DELIVERY_STATUS_ORDER[$message->delivery_status] ?? 0) > (self::DELIVERY_STATUS_ORDER[$status] ?? PHP_INT_MAX);
+        $updates = $isLate ? [] : ['delivery_status' => $status];
         $timestampCarbon = $timestamp ? Carbon::createFromTimestamp((int) $timestamp) : now();
         $shouldFireEvent = false;
 
